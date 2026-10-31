@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793443950516,
+      "tag": "0000_fat_leech",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793444736596,
+      "tag": "0001_workable_puck",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793446117915,
+      "tag": "0002_large_stryfe",
+      "breakpoints": true
+    }
+  ]
+}

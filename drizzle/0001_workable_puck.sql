@@ -1,0 +1,1 @@
+ALTER TABLE `attempts` ADD `evaluating_at` text;

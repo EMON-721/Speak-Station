@@ -1,0 +1,15 @@
+# Regular question additions
+
+The user requested regular new speaking questions. This Site has a private append-only writer at `POST /api/content-batch`.
+
+Before every unattended run:
+
+1. Read this Site with `get_site`. Confirm the caller is owner, audience remains owner-private, the only allowed viewer is the owner, and no groups/external viewers are allowed. Stop on an audience change. Never change access to make an update work.
+2. Obtain current `siwc_bypass_bearer_token` from that response. Do not put it in source, files, task prompts, command arguments or output. It must be sent only to the exact Site origin in the `OAI-Sites-Authorization` header. Do not follow redirects.
+3. Open the Site source using the Sites skill/source helper if needed. The helper `scripts/update-content.py` reads one JSON object on hidden stdin. Start it with `exec_command(tty:true,yield_time_ms:1000)` and then pass the object via `write_stdin` after the readiness line. A read uses `{origin,token,operation:"read",topic}`. A write uses `{origin,token,operation:"write",questions:[...]}`. No credentials are written. All values stay within session memory.
+4. Read current topic/question examples. Author 60 original, varied IELTS-style practice prompts: 24 Part 1, 12 Part 2 cue cards, 24 Part 3 questions. Rotate among the 50 topics, including Education, Technology, Culture and Environment. Use sensible natural questions, not mechanical word substitution. Review grammar, semantic fit, cue-point consistency and duplicates before writing. They are practice questions, not purported official exam questions or predictions.
+5. Each object needs `id`, `part`, `topic`, `difficulty`, `duration`, `text`, `objective`, `related` (array), and `cue` (array) for Part 2. Use IDs `ADD-YYYY-MM-DD-P1-01`, with the current Bangladesh date, correct part and a two-digit index unique within that part. Duration 45 seconds for Part 1, 120 for Parts 2/3. Difficulty Foundation / Intermediate / Advanced respectively. Reuse established topic names. Do not edit or remove existing questions.
+6. Write the batch and verify the readback. The endpoint rejects malformed content, ignores existing IDs, and skips duplicate question text. The helper returns added count and verified IDs. Reuse the same IDs on retry; never create a second batch because a first response was uncertain. If content was skipped for semantic duplication, report it and revise only before an unattempted write or in a new intentional future batch.
+7. Confirm the number added and any blocker. No deployment is needed for routine content additions. Do not call an AI provider with the owner's API key for this task: author the prompts within the scheduled assistant session.
+
+The writer is enabled by server configuration `CONTENT_UPDATES_ALLOWED=owner_private` and relies on the Sites dispatch authentication boundary. **Disable this flag before changing the Site's audience to public or shared.** Browser owner edits additionally require same-origin requests. Service authentication does not grant access to learner records, recordings or provider credentials.
