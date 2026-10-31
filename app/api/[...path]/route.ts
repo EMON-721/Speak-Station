@@ -3,6 +3,7 @@ import {getChatGPTUser} from '../../chatgpt-auth';
 import {questions,byId,dailyQuestions,examQuestions,type Question} from '../../lib/questions';
 import {nextStage,streak} from '../../lib/learning';
 import {assess} from '../../lib/assessment';
+import {transcribeAudio,validAudio,audioMime} from '../../lib/transcription';
 import {z} from 'zod';
 import {assessmentFailureMessage,ProviderFailure} from '../../lib/provider-errors';
 import {aiConfiguration,connectionStatus,encryptCredential,verifyGemini} from '../../lib/integration';
@@ -71,6 +72,16 @@ async function handler(req:Request){
   }catch(e){return fail(assessmentFailureMessage(e),502);}
 
  }
+ if(path==='transcribe'&&req.method==='POST'){
+  const config=await aiConfiguration(E(),db());if(!(config.GEMINI_API_KEY||config.OPENAI_API_KEY))return fail('Connect AI to enable automatic audio transcription.',503);
+  const f=await req.formData(),audio=f.get('audio'),language=String(f.get('language')||'auto');
+  if(!['auto','en-US','bn-BD'].includes(language))return fail('Choose a supported transcription language.');
+  if(!(audio instanceof File)||audio.size<500||audio.size>8*1024*1024||!/^audio\/(webm|ogg|mp4|wav|mpeg)$/.test(audioMime(audio.type)))return fail('Use an audio recording of up to 8 MB.');
+  const bytes=await audio.arrayBuffer();if(!validAudio(bytes))return fail('This file is not a supported audio recording.');
+  const minute='transcribe:'+now().slice(0,16),date='transcribe:'+now().slice(0,10);
+  for(const [key,limit] of [[minute,8],[date,600]] as const){const usage=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,key,limit);if(!usage.meta.changes)return fail('Automatic transcription limit reached. Please wait before retrying.',429);}
+  try{return response({transcript:await transcribeAudio(config,bytes,audioMime(audio.type),language),source:'audio'});}catch(e){return fail(assessmentFailureMessage(e),502);}
+ }
  if(path==='submit'&&req.method==='POST'){
   const config=await aiConfiguration(E(),db());if(!(config.OPENAI_API_KEY||config.GEMINI_API_KEY))return fail('Connect Google AI Studio in AI connection first. Your recording stays on this device.',503);
   const f=await req.formData();const q=(await allQuestions()).find(q=>q.id===String(f.get('questionId')));if(!q)return fail('Question not found.',404);
@@ -81,7 +92,7 @@ async function handler(req:Request){
   if(kind!=='free'){if(!hasAudio)return fail('A recorded answer is required for this learning stage.',409);const s=await state(user);if(s.stage.type!==kind||s.stage.day!==day)return fail('Finish your current learning stage first.',409);const active=await allQuestions();if(!(kind==='daily'?dailyQuestions(day,active):examQuestions(day,active)).some(v=>v.id===q.id))return fail('This question is not assigned to this stage.',409);}
   const date=now().slice(0,10),limit=Math.max(1,Math.min(100,Number(E().DAILY_AI_LIMIT)||20));const used=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,date,limit);if(!used.meta.changes)return fail('Daily assessment limit reached. Try again tomorrow.',429);
   try{const bytes=hasAudio?await audio.arrayBuffer():null;if(bytes){const b=new Uint8Array(bytes);const valid=(b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)||String.fromCharCode(...b.subarray(0,4))==='OggS'||String.fromCharCode(...b.subarray(0,4))==='RIFF'||String.fromCharCode(...b.subarray(4,8))==='ftyp';if(!valid)return fail('This file is not a supported audio recording.');}const feedback=await assess(config,q,hasAudio?transcript:typed,bytes,hasAudio?audio.type:'');if(hasAudio&&((feedback.transcript||transcript).replace(/\[unclear\]/gi,'').trim().length<5))return fail('No clear spoken answer was detected. Try recording again in a quieter place.',422);const id=crypto.randomUUID();const keep=f.get('keepAudio')==='true'&&hasAudio;const key=keep?`${uid}/${id}`:'';if(keep){if(!E().BUCKET)return fail('Optional audio storage is unavailable.',503);await E().BUCKET.put(key,bytes,{httpMetadata:{contentType:audio.type}});}
-   await execute("INSERT INTO attempts (id,user_id,question_id,kind,day,status,duration,audio_key,mime,transcript,feedback,created_at) VALUES (?,?,?,?,?,'evaluated',?,?,?,?,?,?)",id,uid,q.id,kind,day,hasAudio?duration:0,key,hasAudio?audio.type:'text/plain',hasAudio?transcript:typed,JSON.stringify(feedback),now());return response({id,feedback,audioSaved:keep,textOnly:!hasAudio});
+   await execute("INSERT INTO attempts (id,user_id,question_id,kind,day,status,duration,audio_key,mime,transcript,feedback,created_at) VALUES (?,?,?,?,?,'evaluated',?,?,?,?,?,?)",id,uid,q.id,kind,day,hasAudio?duration:0,key,hasAudio?audio.type:'text/plain',hasAudio?(feedback.transcript||transcript):typed,JSON.stringify(feedback),now());return response({id,feedback,audioSaved:keep,textOnly:!hasAudio});
   }catch(e){return fail(assessmentFailureMessage(e),502);}
  }
  if(req.method==='POST'&&path==='record'){

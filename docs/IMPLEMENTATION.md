@@ -47,3 +47,12 @@ Model availability is verified by a small generation request, not just the model
 For this learning workload, connection refresh prefers a current stable Flash-Lite model to reduce cost and latency. General Flash remains an advertised-model fallback. A 503 model outage can try another advertised candidate; quota and permission failures still stop immediately.
 
 Gemini uses JSON mode plus strict server-side validation of all substantive feedback fields. Confidence metadata may be a string, numeric or absent; non-string values are displayed as an uncalibrated AI suggestion rather than a numeric reliability claim. Provider schema options are avoided for compatibility with the active Flash-Lite endpoint.
+
+
+## Automatic transcription repair — 31 October 2026
+
+The first interim words now appear before a final browser recognition result. Browser recognition restarts after recoverable interruptions and stops retrying permission failures. A separate complete-WAV capture sends cumulative 16 kHz mono snapshots to the authenticated transcription API about every 12 seconds. A final automatic request uses the completed recording after Stop, independently of assessment. Responses from a previous question or recording are discarded; request failures preserve the audio and provide Retry automatic transcript. Auto language mode preserves Bengali script and English without translating.
+
+The transcription endpoint validates audio, requires signed-in identity and same origin, rate-limits independently of assessments, and does not save recordings, learner attempts or learning completion. Audio-derived assessment transcripts are saved and shown in the main transcript panel. Optional manual text practice is collapsed and clearly separated. Recording consent now describes automatic audio transmission. The owner connection panel includes a real synthetic-audio transcription test.
+
+Checks: scripts/checks/transcription.mjs covers interim words, mixed scripts, complete WAV snapshots, resampling, pause/cleanup and provider transport. API checks cover authenticated audio transcription, same-origin enforcement, malformed files, safe provider errors and unchanged learning records. Device microphone permission and speech-service support remain browser dependent.
