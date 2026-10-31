@@ -1,24 +1,23 @@
 # Speak Station
 
-Speak Station is a focused IELTS speaking workspace built around a simple habit: practise, record, reflect and try again.
+Speak Station is an English speaking practice workspace for IELTS preparation. Learners choose a question, record an answer, review feedback and practise again.
 
-## The learning experience
+## Practice and learning
 
-- A growing 3,000+ prompt library spanning all three speaking parts and 50 topics.
-- Daily eight-question learning sessions with 90, 120, 180 and 210-day tracks.
-- Microphone recording with clear permission recovery, English/Bengali live transcription and transcript fallback.
-- Thirty weekly exam sets and fifteen revision sets, brought together on one homepage.
-- An owner-only Google AI Studio connection panel with encrypted credential storage.
-- Storage-conscious assessment: permanent audio saving is optional.
-- Detailed sentence corrections, answer-gap feedback, contextual vocabulary and improved answers.
-- A personal revision centre for saved questions, corrections and expressions.
-- Speaking lessons, practice interviews, an audio history and learning analytics.
-- Private account-owned recordings and server-checked learning progression.
+The library includes 3,852 original and template-based practice questions across 62 topics, covering personal interviews, cue cards and discussion. Education, technology, culture, environment, hometown, work, travel, family, villages and regional life are part of the collection.
 
-## How it fits together
+Daily learning tracks bring together eight questions, weekly speaking tests and revision checkpoints. Audio-based feedback explains sentence corrections, answer gaps, contextual vocabulary, pronunciation evidence and targeted practice drills. Complete tests use a 6.5/9 practice pass threshold. AI estimates support learning and are distinct from official IELTS results.
 
-The React interface runs on Vinext. A server API manages account data and learning rules in Cloudflare D1, while private audio lives in R2. Sites provides the sign-in boundary and deployment. Provider adapters support OpenAI and Google Gemini for diagnostic feedback; credentials remain server-side.
+Automatic transcription shows recognised English speech during recording and completes the transcript after recording stops. Permanent audio saving is optional; transcripts and feedback remain available in progress.
 
-Original audio and browser transcripts stay separate from personal notes and AI-derived text. Practice indicators are kept distinct from official IELTS results.
+## Owner workspace
 
-See [implementation status](docs/IMPLEMENTATION.md) for deployment configuration, validation and the remaining production integrations.
+The administrator can publish branding, page copy, colours and typography; show, hide and reorder sections; manage navigation, statistic cards, feature cards, milestones, topics, questions, exams and lessons; and add custom sections. A visual layout editor can hide individual cards or subsections.
+
+Learner management includes suspension, restoration, account removal and documented test-pass overrides. Private support messages and administrator replies stay inside the learner’s account. Administrative changes are recorded in an audit log.
+
+## Architecture
+
+A React interface on Vinext connects to a server API, Cloudflare D1 for structured account and content data, and private R2 storage for optional recordings. Sites supplies the deployment and sign-in boundary. Gemini provides transcription and audio feedback through an encrypted, owner-managed API connection. Authentication, administrative permissions, account status and learning gates are enforced on the server.
+
+See the [administrator guide](docs/ADMIN_GUIDE.md) for the editing workflow and the [implementation notes](docs/IMPLEMENTATION.md) for validation and deployment details.

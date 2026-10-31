@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const url=(source)=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText).toString('base64');
-const load=async f=>{let source=fs.readFileSync(f,'utf8');if(f.endsWith('questions.ts'))source=source.replace("'./topic-pack'",JSON.stringify(url(fs.readFileSync('app/lib/topic-pack.ts','utf8'))));return import(url(source))};
+const load=async f=>{let source=fs.readFileSync(f,'utf8');if(f.endsWith('questions.ts'))source=source.replace("'./topic-pack'",JSON.stringify(url(fs.readFileSync('app/lib/topic-pack.ts','utf8')))).replace("'./expanded-pack'",JSON.stringify(url(fs.readFileSync('app/lib/expanded-pack.ts','utf8'))));return import(url(source))};
 const {questions,dailyQuestions,examSets,revisionSets,examQuestions}=await load('app/lib/questions.ts');
 const {nextStage,streak}=await load('app/lib/learning.ts');
-assert.equal(questions.length,3060);assert.equal(new Set(questions.map(q=>q.id)).size,3060);assert.equal(new Set(questions.map(q=>q.text)).size,3060);
-for(const [part,count] of [[1,1524],[2,612],[3,924]])assert.equal(questions.filter(q=>q.part===part).length,count);
+assert.equal(questions.length,3852);assert.equal(new Set(questions.map(q=>q.id)).size,3852);assert.equal(new Set(questions.map(q=>q.text)).size,3852);
+for(const [part,count] of [[1,1920],[2,768],[3,1164]])assert.equal(questions.filter(q=>q.part===part).length,count);
 for(let day=1;day<=210;day++){const q=dailyQuestions(day);assert.equal(q.length,8);assert.deepEqual([1,2,3].map(p=>q.filter(v=>v.part===p).length),[4,1,3]);assert.equal(new Set(q.map(v=>v.id)).size,8);}
 assert.deepEqual(nextStage([],[]),{type:'daily',day:1});
 assert.deepEqual(nextStage([1,3],[]),{type:'daily',day:2});
@@ -19,5 +19,5 @@ assert.deepEqual(nextStage(fourteen,[{kind:'weekly',milestone:7},{kind:'weekly',
 assert.equal(streak(['2026-10-30T18:30:00Z','2026-10-29T18:30:00Z'],new Date('2026-10-31T10:00:00Z')),2);
 assert.equal(streak(['2026-10-20T00:00:00Z'],new Date('2026-10-31T10:00:00Z')),0);
 const allDays=Array.from({length:210},(_,i)=>i+1);const priorTests=Array.from({length:29},(_,i)=>({kind:'weekly',milestone:(i+1)*7})).concat(Array.from({length:14},(_,i)=>({kind:'revision',milestone:(i+1)*14})));assert.deepEqual(nextStage(allDays,priorTests,210),{type:'weekly',day:210});assert.deepEqual(nextStage(allDays,[...priorTests,{kind:'weekly',milestone:210}],210),{type:'revision',day:210});assert.deepEqual(nextStage(allDays,[...priorTests,{kind:'weekly',milestone:210},{kind:'revision',milestone:210}],210),{type:'complete',day:210});
-const {microphoneError}=await load('app/lib/microphone.ts');assert.equal(microphoneError('NotAllowedError').kind,'permission');assert.equal(microphoneError('NotAllowedError',true,false).kind,'embedded');assert.equal(microphoneError('NotFoundError').kind,'device');assert.equal(microphoneError('NotReadableError').kind,'device');assert.equal(examSets.length,30);assert.equal(revisionSets.length,15);for(const exam of [...examSets,...revisionSets])assert.deepEqual([1,2,3].map(p=>examQuestions(exam.day).filter(q=>q.part===p).length),[4,1,3]);assert.equal(new Set(Array.from({length:50},(_,i)=>dailyQuestions(i+1)[0].topic)).size,50);
-console.log('PASS: 3,060 unique questions, distribution, 210 daily assignments and all 30 final weekly/revision gates, weekly/revision locks and Bangladesh-time streaks.');
+const {microphoneError}=await load('app/lib/microphone.ts');assert.equal(microphoneError('NotAllowedError').kind,'permission');assert.equal(microphoneError('NotAllowedError',true,false).kind,'embedded');assert.equal(microphoneError('NotFoundError').kind,'device');assert.equal(microphoneError('NotReadableError').kind,'device');assert.equal(examSets.length,30);assert.equal(revisionSets.length,15);for(const exam of [...examSets,...revisionSets])assert.deepEqual([1,2,3].map(p=>examQuestions(exam.day).filter(q=>q.part===p).length),[4,1,3]);assert.equal(new Set(Array.from({length:62},(_,i)=>dailyQuestions(i+1)[0].topic)).size,62);
+console.log('PASS: 3,852 unique questions, distribution, 210 daily assignments and all 30 final weekly/revision gates, weekly/revision locks and Bangladesh-time streaks.');
