@@ -1,0 +1,21 @@
+{
+  // Separate configuration for your own Cloudflare Workers Free account.
+  "name": "speak-station",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "no_bundle": true,
+  "rules": [{"type":"ESModule","globs":["**/*.js","**/*.mjs"]}],
+  "assets": {"directory": "dist/client", "binding": "ASSETS"},
+  "d1_databases": [{"binding":"DB","database_name":"speak-station-free","database_id":"00000000-0000-4000-8000-000000000000","migrations_dir":"drizzle"}],
+  "vars": {
+    "AUTH_MODE": "google",
+    "APP_ORIGIN": "https://speak-station.YOUR_SUBDOMAIN.workers.dev",
+    "ADMIN_EMAIL": "YOUR_VERIFIED_GOOGLE_EMAIL",
+    "DAILY_AI_LIMIT": "20",
+    "CONTENT_UPDATES_ALLOWED": "disabled"
+  }
+  // No R2 subscription, paid plan, custom domain purchase or AI billing is enabled here.
+  // Add AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
+  // CREDENTIAL_ENCRYPTION_KEY as Worker secrets. Never put secrets in this file.
+}

@@ -21,3 +21,5 @@ Learner management includes suspension, restoration, account removal and documen
 A React interface on Vinext connects to a server API, Cloudflare D1 for structured account and content data, and private R2 storage for optional recordings. Sites supplies the deployment and sign-in boundary. Gemini provides transcription and audio feedback through an encrypted, owner-managed API connection. Authentication, administrative permissions, account status and learning gates are enforced on the server.
 
 See the [administrator guide](docs/ADMIN_GUIDE.md) for the editing workflow and the [implementation notes](docs/IMPLEMENTATION.md) for validation and deployment details.
+
+For your own account, the [Cloudflare Free hosting guide](docs/CLOUDFLARE_FREE.md) uses Workers Free and D1 with Google sign-in, without an R2 subscription or permanent audio storage.

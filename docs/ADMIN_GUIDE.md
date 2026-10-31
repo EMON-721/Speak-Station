@@ -16,6 +16,8 @@ Publish website changes saves the configuration to the server. If another tab ha
 
 Topic and question actions publish immediately. Add a topic, then add questions for Parts 1, 2 and 3. A topic needs all three parts before it joins the daily rotation. The question editor controls the part, topic, wording, difficulty, duration, learning objective and cue points. Deletion archives questions while preserving prior answers. Rename a topic to update its question labels.
 
+Open **Topics → Manage questions** to browse a topic or **Topics → Add question** to start with that topic selected. **Questions** opens the entire collection. Search matches words in any order across question text, IDs, topics, objectives and cue points before pagination. Combine topic, speaking part and status filters; choose 10–100 questions per page, jump to a page, or use First/Last. Each result has Edit and Delete. Undo a deletion immediately, or choose **Deleted questions** and Restore later. Questions used in custom exams must be removed from those exams before deletion.
+
 Exam collections control the visible catalogue and the learning milestone schedule. Use unique numbers and days within each exam type. Leave question IDs empty to use the daily rotation for that day, or list a custom set containing all three speaking parts. Remove question references from custom exams before deleting those questions or topics.
 
 A recorded test passes at a practice band of 6.5/9 or above. The server requires every assigned answer to be recorded, assessed and reviewed. All four criterion estimates require sufficient audio evidence. Text-only practice cannot pass a recorded test. Practice scores are AI estimates, not official IELTS results.

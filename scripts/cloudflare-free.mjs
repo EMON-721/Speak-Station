@@ -1,0 +1,9 @@
+import fs from 'node:fs';import {spawnSync} from 'node:child_process';
+const command=process.argv[2]||'build',configuration='wrangler.cloudflare.jsonc';
+const run=(args,env={})=>{const r=spawnSync(process.execPath,args,{stdio:'inherit',env:{...process.env,...env}});if(r.error)throw r.error;if(r.status!==0)process.exit(r.status||1);};
+if(command==='build'){run(['scripts/run-framework.mjs','build'],{SPEAK_CLOUDFLARE_BUILD:'1'});const generated=JSON.parse(fs.readFileSync('dist/server/wrangler.json','utf8'));if(generated.r2_buckets?.length)throw new Error('Standalone free build must not require R2.');console.log('Cloudflare build ready. Use wrangler.cloudflare.jsonc for your account; Sites configuration is unchanged.');}
+else if(command==='deploy'||command==='check'){
+ const raw=fs.readFileSync(configuration,'utf8');if(raw.includes('YOUR_SUBDOMAIN')||raw.includes('YOUR_VERIFIED_GOOGLE_EMAIL')||raw.includes('00000000-0000-4000-8000-000000000000'))throw new Error('Set your real D1 database ID, workers.dev origin and verified owner email in wrangler.cloudflare.jsonc first.');if(/"r2_buckets"\s*:/.test(raw))throw new Error('Card-free configuration must not bind R2.');if(!raw.includes('"CONTENT_UPDATES_ALLOWED": "disabled"'))throw new Error('The private Sites content writer must stay disabled on standalone hosting.');
+ if(!/"AUTH_MODE"\s*:\s*"google"/.test(raw))throw new Error('Standalone hosting requires verified Google authentication.');
+ if(command==='deploy'){if(!fs.existsSync('dist/server/wrangler.json')||JSON.parse(fs.readFileSync('dist/server/wrangler.json','utf8')).r2_buckets?.length)throw new Error('Run build:cloudflare first; the native Sites build must not be deployed to your account.');run(['node_modules/wrangler/bin/wrangler.js','deploy','--config',configuration]);}else console.log('Cloudflare configuration contains no placeholders or R2 subscription.');
+}else throw new Error('Use build, check or deploy.');
