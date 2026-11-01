@@ -76,12 +76,12 @@ assert.equal(aligned[2].correctedAnswer,null,'missing correction must never be g
 assert.equal(aligned[2].transcript,'Sometimes with my friends.','missing AI transcript falls back to recorded browser transcript');
 assert.equal(aligned[3].correctedAnswer,'I would improve the buses.','fourth correction stays with question 4');
 const prompt=fs.readFileSync('app/lib/part-assessment.ts','utf8');
-const report=fs.readFileSync('app/feedback-report.tsx','utf8');
+const feedbackComponentSource=fs.readFileSync('app/feedback-report.tsx','utf8');
 const cards=fs.readFileSync('app/question-answer-cards.tsx','utf8');
 assert(prompt.includes('questionFeedback')&&prompt.includes('exact questionId'),'one-part Gemini prompt requests stable per-question answer grouping');
 assert(frontend.includes('questionReviews={partReports[selected.part]?questionReviewsForPart(selected.part):[]}'),'Part report sends aligned answers to feedback renderer');
 assert(frontend.includes('<QuestionAnswerCards answers={questionReviewsForPart(p)}'),'previous parts keep their grouped answers');
-assert(report.includes('<QuestionAnswerCards answers={questionReviews}'),'full answer tab displays per-question cards');
+assert(feedbackComponentSource.includes('<QuestionAnswerCards answers={questionReviews}'),'full answer tab displays per-question cards');
 assert(cards.includes('Your original answer')&&cards.includes('Your corrected answer'),'each card separates original and corrected spoken answers');
 console.log('PASS: distinct question/answer mapping, missing model review fallback, and question-specific corrected-answer UI');
 
