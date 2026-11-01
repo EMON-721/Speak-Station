@@ -28,6 +28,10 @@ await check('Unauthenticated state API','/api/state',{},(r,body)=>{
 });
 await check('Question bank requires login','/api/questions',{},r=>assert([401,403].includes(r.status),'question bank should be protected'));
 await check('Admin endpoint requires login','/api/admin/questions',{},r=>assert([401,403].includes(r.status),'admin API must be protected'));
+await check('Owner diagnostics endpoint rejects guests','/api/admin/diagnostics',{},r=>assert([401,403].includes(r.status),'private D1 and AI checks must never be public'));
+await check('Guest cannot trigger a live AI connection test','/api/integration/test',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:'{}'},r=>assert([401,403].includes(r.status),'AI credential tests require authentication'));
+await check('Unauthenticated Google callback fails safely','/callback?code=untrusted&state=invalid',{},(r,body)=>assert([400,401].includes(r.status)&&!/access_token|refresh_token|client_secret/i.test(body),'invalid callback cannot create a user session'));
+
 await check('Session-changing request rejects unauthenticated submission','/api/record',{method:'POST'},r=>assert([401,403,405].includes(r.status),'unauthenticated post is rejected'));
 await check('Favicon loads','/favicon.svg',{},(r,body)=>{assert.equal(r.status,200);assert(/<svg/.test(body),'favicon must be SVG')});
 for(const r of results)console.log(r.status.padEnd(5),r.name,r.http||'—',r.detail);
