@@ -34,5 +34,24 @@ jobs:
         run: node scripts/tests/verify-speaking-parts.mjs
       - name: Preserve core learner-facing features
         run: node scripts/tests/verify-features.mjs
+      - name: Check real 240-book content and all 45 scheduled exams
+        run: node scripts/tests/verify-real-content.mjs
+      - name: Verify all D1 migrations and progress storage
+        run: python3 scripts/tests/verify-d1-migrations.py
+      - name: Google OAuth and protected identity security tests
+        run: node scripts/tests/verify-google-oauth.mjs
       - name: Cloudflare production build (no secrets)
         run: pnpm run build:cloudflare
+
+      - name: Public production smoke check (external, non-blocking)
+        id: live_smoke
+        continue-on-error: true
+        env:
+          SPEAK_PUBLIC_URL: https://speak-station.emon721.workers.dev
+        run: node scripts/tests/live-public-smoke.mjs
+      - name: Summarize production verification limitations
+        if: always()
+        run: |
+          echo "### Verification scope" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pure logic, real question bank, OAuth security and migration tests execute in this job." >> "$GITHUB_STEP_SUMMARY"
+          echo "Live smoke verifies public endpoints only. Authenticated Google sign-in completion, live microphone, actual AI provider, admin access and mobile layouts still need independent end-to-end browser testing." >> "$GITHUB_STEP_SUMMARY"
