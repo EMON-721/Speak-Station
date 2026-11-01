@@ -6,6 +6,7 @@ import {getChatGPTUser} from '../../chatgpt-auth';
 import {questions,byId,dailyQuestions,examQuestions,type Question} from '../../lib/questions';
 import {nextStage,streak} from '../../lib/learning';
 import {assess} from '../../lib/assessment';
+import {assessSpeakingPart,type PartAnswer} from '../../lib/part-assessment';
 import {transcribeAudio,validAudio,audioMime} from '../../lib/transcription';
 import {z} from 'zod';
 import {assessmentFailureMessage,ProviderFailure} from '../../lib/provider-errors';
@@ -90,6 +91,61 @@ async function handler(req:Request){
   const minute='transcribe:'+now().slice(0,16),date='transcribe:'+now().slice(0,10);
   for(const [key,limit] of [[minute,8],[date,600]] as const){const usage=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,key,limit);if(!usage.meta.changes)return fail('Automatic transcription limit reached. Please wait before retrying.',429);}
   try{return response({transcript:await transcribeAudio(config,bytes,audioMime(audio.type),language),source:'audio'});}catch(e){return fail(assessmentFailureMessage(e),502);}
+ }
+
+ if(path==='assess-part'&&req.method==='POST'){
+  const config=await aiConfiguration(E(),db());
+  if(!config.GEMINI_API_KEY)return fail('No usable Gemini connection was found in this Cloudflare environment. Ask the owner to test the existing API connection.',503);
+  const form=await req.formData();
+  let meta:any;
+  try{meta=z.object({
+   kind:z.enum(['free','daily','weekly','revision']),
+   day:z.number().int().min(0).max(1000),
+   part:z.union([z.literal(1),z.literal(2),z.literal(3)]),
+   bookNumber:z.number().int().min(1).max(240).optional(),
+   answers:z.array(z.object({questionId:z.string().min(1).max(120),transcript:z.string().max(8000),duration:z.number().min(3).max(900)})).min(1).max(8)
+  }).parse(JSON.parse(String(form.get('meta')||'{}')))}catch{return fail('Invalid speaking part details.',400)}
+  const ids=meta.answers.map((a:any)=>a.questionId);
+  if(new Set(ids).size!==ids.length)return fail('Each speaking question must be unique.',400);
+  const bank=await allQuestions();
+  let assigned:Question[];
+  if(meta.kind==='free'){
+   if(!meta.bookNumber)return fail('Choose a complete speaking book first.',400);
+   const book=buildSpeakingBooks(bank,240)[meta.bookNumber-1];
+   if(!book||meta.day!==meta.bookNumber)return fail('This book no longer matches your session.',409);
+   assigned=book.questions;
+  }else{
+   const current=await learningContext(uid);
+   if(current.stage.type!==meta.kind||current.stage.day!==meta.day)return fail('Your learning session is no longer active. Refresh and try again.',409);
+   assigned=meta.kind==='daily'?dailyQuestions(meta.day,bank):stageQuestions(meta.day,meta.kind,bank,current.content,examQuestions);
+  }
+  const expected=assigned.filter(q=>q.part===meta.part);
+  if(!expected.length||expected.length!==ids.length||expected.some((q,i)=>q.id!==ids[i]))return fail('Complete every question in this part before requesting the AI assessment.',409);
+  const answers:PartAnswer[]=[];
+  let total=0;
+  for(const [index,item] of meta.answers.entries()){
+   const file=form.get('audio_'+index);
+   if(!(file instanceof File)||file.size<500||file.size>7*1024*1024)return fail('Every question requires an audio recording smaller than 7 MB.',413);
+   const mime=audioMime(file.type);
+   if(!/^audio\/(webm|ogg|mp4|wav|mpeg)$/.test(mime))return fail('Unsupported recorded audio format.',400);
+   total+=file.size;if(total>16*1024*1024)return fail('Speaking part audio exceeds the 16 MB upload limit. Use shorter or smaller recordings.',413);
+   const buffer=await file.arrayBuffer();
+   if(!validAudio(buffer))return fail('One of the uploaded recordings is invalid.',400);
+   answers.push({question:expected[index],transcript:item.transcript,audio:buffer,mime,duration:item.duration});
+  }
+  const date=now().slice(0,10),limit=Math.max(1,Math.min(100,Number(E().DAILY_AI_LIMIT)||20));
+  const used=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,date,limit);
+  if(!used.meta.changes)return fail('Daily AI assessment limit reached. Try again tomorrow.',429);
+  try{
+   const feedback=await assessSpeakingPart(config,meta.part,answers);
+   const scores=['fluency','lexical','grammar','pronunciation'].map(k=>(feedback.criteria as any)[k].score);
+   const receipts=await Promise.all(answers.map(async item=>{
+    const id=crypto.randomUUID();
+    const receipt=await issueReceipt({id,userId:uid,questionId:item.question.id,kind:meta.kind,day:meta.day,recorded:true,reviewed:true,scores,exp:Date.now()+12*3600000},receiptSecret());
+    return {id,questionId:item.question.id,receipt};
+   }));
+   return response({part:meta.part,feedback,receipts,assessmentCount:1,source:'gemini',official:false});
+  }catch(error){return fail(assessmentFailureMessage(error),502)}
  }
  if(path==='submit'&&req.method==='POST'){
   const config=await aiConfiguration(E(),db());if(!(config.OPENAI_API_KEY||config.GEMINI_API_KEY))return fail('Connect Google AI Studio in AI connection first. Your recording stays on this device.',503);

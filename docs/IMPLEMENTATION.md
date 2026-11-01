@@ -55,3 +55,9 @@ Added 20 distinct cross-part themes with 8 Part 1 prompts, 3 cue-card prompts, a
 - AI configuration is one shared server-side source for Daily Practice, full books, Sample Mock, weekly and revision assessments. Stored D1 AES-GCM credentials are used when they decrypt; existing Cloudflare GEMINI_API_KEY Secrets are respected as a fallback. An older environment's key cannot be fabricated or retrieved from GitHub. Owner panel shows diagnostics and hides reconnect form when a connection already exists.
 
 - The complete Part 1/Part 2/Part 3 question overview is now shared by daily, weekly, revision, book and mock practice. The recording studio is not shown until a full session starts. Legacy single-question deep links and saved bookmarks are redirected to a containing book.
+
+## Part-level audio-only Gemini assessment (2026-11)
+- /api/assess-part validates complete ordered question groups, verified user session, recorded evidence, and the original book/stage assignment before any Gemini call.
+- A single Gemini request with all audio clips/transcripts is made after each part, not after each question. No practice band is fabricated.
+- Signed per-question receipts represent one reviewed part assessment. The existing final server evaluation combines these receipts; no audio is permanently stored.
+- GEMINI_API_KEY is read from the previously encrypted D1 connection, or a Cloudflare Worker Secret. Never write API credentials into git.
