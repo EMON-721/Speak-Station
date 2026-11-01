@@ -86,3 +86,29 @@ assert(feedbackComponentSource.includes('<QuestionAnswerCards answers={questionR
 assert(cards.includes('Your original answer')&&cards.includes('Your corrected answer'),'each card separates original and corrected spoken answers');
 console.log('PASS: distinct question/answer mapping, missing model review fallback, and question-specific corrected-answer UI');
 
+
+
+const {weeklyGate,passedTest,cooldownUntil,isCoolingDown}=loadTs('app/lib/weekly-policy.ts');
+const pass=(kind,number)=>({kind,milestone:number*(kind==='weekly'?7:14),answers:JSON.stringify({passed:true,practiceBand:6,partScores:{1:6,2:6,3:6}})});
+const fail=(kind,number)=>({kind,milestone:number*(kind==='weekly'?7:14),answers:JSON.stringify({passed:false,practiceBand:5.5,partScores:{1:5,2:6,3:5.5}})});
+assert.equal(weeklyGate([], 'weekly', 1).unlocked,true,'first weekly test opens immediately');
+assert.equal(weeklyGate([], 'weekly', 2).unlocked,false,'weekly 2 remains locked before weekly 1');
+assert.equal(weeklyGate([fail('weekly',1)],'weekly',2).unlocked,false,'failed weekly result cannot unlock the next exam');
+assert.equal(weeklyGate([pass('weekly',1)],'weekly',2).unlocked,true,'a 6.0 result unlocks the following weekly test');
+assert.equal(weeklyGate([pass('weekly',1),pass('weekly',2)],'weekly',3).unlocked,false,'weekly 3 requires a mandatory revision');
+assert.equal(weeklyGate([pass('weekly',1),pass('weekly',2)],'revision',1).unlocked,true,'revision unlocks after two passed weekly tests');
+assert.equal(weeklyGate([pass('weekly',1),pass('weekly',2),fail('revision',1)],'weekly',3).unlocked,false,'failed revision does not unlock weekly 3');
+assert.equal(weeklyGate([pass('weekly',1),pass('weekly',2),pass('revision',1)],'weekly',3).unlocked,true,'passed revision unlocks weekly 3');
+assert.equal(weeklyGate([pass('weekly',1),pass('weekly',2),pass('revision',1),pass('weekly',3),pass('weekly',4)],'weekly',5).unlocked,false,'revision gates repeat after every two weekly tests');
+assert.equal(passedTest(pass('weekly',1)),true);
+const completeAt='2026-11-01T06:00:00.000Z';
+const expiry=cooldownUntil(completeAt);
+assert.equal(expiry,'2026-11-16T06:00:00.000Z','practice question cooldown is exactly 15 days');
+assert.equal(isCoolingDown(expiry,new Date('2026-11-15T00:00:00Z')),true);
+assert.equal(isCoolingDown(expiry,new Date('2026-11-16T06:00:00Z')),false);
+const ux=fs.readFileSync('app/workspace.tsx','utf8');
+assert(ux.includes('sample-mock-preview')&&ux.includes('PREVIEW ONLY'),'sample mock is preview-only');
+assert(ux.includes('weeklyGate(data.tests'),'weekly exam card respects server progression policy');
+assert(ux.includes('book-on-cooldown'),'book UI disallows repeat questions for 15 days');
+assert(!ux.includes('<button onClick={()=>navigate(\'admin\')}>Admin</button>'),'public footer no longer advertises admin control');
+console.log('PASS: 6.0 weekly pass threshold, sequential unlock, mandatory revision, 15-day cooldown, sample preview, public footer');
