@@ -17,6 +17,7 @@ export function loadTs(file){
   const target=path.resolve(path.dirname(full),source);
   if(fs.existsSync(target+'.ts'))return loadTs(target+'.ts');
   if(fs.existsSync(target+'.tsx'))return loadTs(target+'.tsx');
+  if(target.endsWith('.json')&&fs.existsSync(target))return JSON.parse(fs.readFileSync(target,'utf8'));
   if(fs.existsSync(target+'.json'))return JSON.parse(fs.readFileSync(target+'.json','utf8'));
   if(fs.existsSync(target))return loadTs(target);
   throw Error('Cannot load '+source+' from '+file);
