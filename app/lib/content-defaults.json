@@ -589,7 +589,7 @@
   "navigation": [
     {
       "id": "practice",
-      "label": "Speaking practice",
+      "label": "Daily speaking practice",
       "target": "practice",
       "visible": true
     },

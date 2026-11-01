@@ -53,3 +53,5 @@ Added 20 distinct cross-part themes with 8 Part 1 prompts, 3 cue-card prompts, a
 - Removed the visible standalone-question catalog; all navigation now leads to complete three-part books. Original questions and existing learning state are retained. Former question links now open a matching book.
 - Added a Sample Mock placeholder using Book 001 (all three parts, no invented answer or score). Awaiting owner-provided example content.
 - AI configuration is one shared server-side source for Daily Practice, full books, Sample Mock, weekly and revision assessments. Stored D1 AES-GCM credentials are used when they decrypt; existing Cloudflare GEMINI_API_KEY Secrets are respected as a fallback. An older environment's key cannot be fabricated or retrieved from GitHub. Owner panel shows diagnostics and hides reconnect form when a connection already exists.
+
+- The complete Part 1/Part 2/Part 3 question overview is now shared by daily, weekly, revision, book and mock practice. The recording studio is not shown until a full session starts. Legacy single-question deep links and saved bookmarks are redirected to a containing book.
