@@ -13,10 +13,12 @@ function record(name,status,detail=''){checks.push({name,status,detail});console
 let profile={name:'QA Learner',phone:'',target:'8.0',track:210,exam_date:''};
 let tests=[];
 let adminMode=false;
+let scheduledBegins=0;
+const eligibleSchedule={practice:{allowed:true,nextAt:null,reason:'Ready to begin',recentCount:0,modulesCompleted:2},test:{allowed:true,nextAt:null,reason:'Ready to begin',recentCount:0,modulesCompleted:2}};
 let assessmentCalls={1:0,2:0,3:0};
 const fakeState=()=>({user:{id:'qa-user',name:'QA Learner',email:'qa@example.test'},profile,
  authProvider:'Google',content:defaultContent,contentRevision:0,attempts:[],saved:[],completed:[],activityDays:[],tests,
- streak:0,stage:{type:'daily',day:1},cooldowns:[],weeklyPassBand:6,aiConfigured:true,connection:{configured:true,source:'qa-mock'},
+ streak:0,stage:{type:'daily',day:1},cooldowns:[],scheduling:eligibleSchedule,weeklyPassBand:6,aiConfigured:true,connection:{configured:true,source:'qa-mock'},
  storageReady:true,audioStorageReady:false,learningStorage:'progress-only',messages:[],isAdmin:adminMode});
 const fakeCriteria=()=>Object.fromEntries(['fluency','lexical','grammar','pronunciation'].map(k=>[k,{observation:'Clear evidence in audio',score:6,evidence:['Speech was understandable'],drill:'Practise this answer once more.'}]));
 const reply=async(route,payload,status=200)=>route.fulfill({status,contentType:'application/json; charset=utf-8',body:JSON.stringify(payload)});
@@ -41,6 +43,7 @@ await page.addInitScript(()=>{
 await page.route('**/api/**',async route=>{
  const req=route.request(),path=new URL(req.url()).pathname;
  if(path==='/api/state')return reply(route,fakeState());
+ if(path==='/api/begin-session'){scheduledBegins++;return reply(route,{sessionId:'00000000-0000-4000-8000-000000000001',startedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString(),resumed:false,scheduling:eligibleSchedule})}
  if(path==='/api/questions')return reply(route,{questions});
  if(path==='/api/content')return reply(route,{content:defaultContent});
  if(path==='/api/admin/overview')return reply(route,{administratorEmail:'qa@example.test',users:[],messages:[],activity:[]});
@@ -205,6 +208,7 @@ try{
   adminMode=false;
  });
 
+ assert(scheduledBegins>=2,'All practice launches must reserve a server-issued session');
  assert.equal(browserErrors.length,0,'No JavaScript page crashes: '+browserErrors.slice(0,3).join(' | '));
  record('No uncaught browser JavaScript errors','PASS');
 }catch(error){console.log('Browser suite stopped at first failed control; see screenshots and error above.');process.exitCode=1}

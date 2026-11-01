@@ -33,3 +33,10 @@ assert(api.includes('activityDays:days.map('),'server must return real dated act
 assert(api.includes('durationSeconds:result.durationSeconds'),'score history keeps numerical duration but not raw audio');
 assert(api.includes('compactIssueCounts('),'server must derive safe error-category totals');
 console.log('PASS: Protected dashboard, achievements, profile, guidelines and detailed feedback preserved');
+
+const policy=fs.readFileSync('app/lib/session-policy.ts','utf8');
+assert(policy.includes('PRACTICE_INTERVAL_MS=6*60*60*1000'));
+assert(policy.includes('TEST_INTERVAL_MS=7*24*60*60*1000'));
+assert(ui.includes("api('begin-session'"),'session start must be admitted by D1');
+assert(api.includes('requireStudySession('),'AI assessment and score submission must verify the server-issued session');
+console.log('PASS: server-enforced study schedules and quota display preserved');

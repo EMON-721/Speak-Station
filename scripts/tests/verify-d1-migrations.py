@@ -4,12 +4,12 @@ import pathlib, sqlite3, json, datetime, uuid
 conn=sqlite3.connect(':memory:')
 conn.execute('PRAGMA foreign_keys=ON')
 files=sorted(pathlib.Path('drizzle').glob('*.sql'))
-assert len(files)>=6, 'Migrations missing'
+assert len(files)>=7, 'Migrations missing'
 for path in files:
     statements=path.read_text().replace('--> statement-breakpoint','').strip()
     conn.executescript(statements)
 tables={r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-required={'attempts','audit','days','question_overrides','profiles','saved','tests','usage','settings','messages','user_access','question_cooldowns'}
+required={'attempts','audit','days','question_overrides','profiles','saved','tests','usage','settings','messages','user_access','question_cooldowns','study_sessions'}
 assert required.issubset(tables),f'Missing tables: {required-tables}'
 cols=lambda table:{r[1] for r in conn.execute(f'PRAGMA table_info("{table}")')}
 assert {'user_id','name','target','track','exam_date','phone','created_at'}.issubset(cols('profiles'))
@@ -33,3 +33,29 @@ assert conn.execute('SELECT day,completed_at FROM days WHERE user_id=?',(user,))
 idx={r[1] for r in conn.execute("PRAGMA index_list('question_cooldowns')")}
 assert 'question_cooldowns_expiration_idx' in idx
 print('PASS: '+str(len(files))+' D1 migrations, all tables, profile, scoring, day history and cooldown SQL')
+
+# The start-time table stores no audio, transcript or feedback, only minimum quota metadata.
+assert {'id','user_id','category','kind','day','mode','started_at','expires_at','completed_at'}.issubset(cols('study_sessions'))
+origin='2026-11-01T00:00:00.000Z'
+cutoff6='2026-10-31T18:00:00.000Z'
+cutoff24='2026-10-31T00:00:00.000Z'
+session_sql="""INSERT INTO study_sessions(id,user_id,category,kind,day,mode,started_at,expires_at)
+SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM study_sessions WHERE user_id=? AND category='practice' AND started_at>?)
+AND (SELECT COUNT(*) FROM study_sessions WHERE user_id=? AND category='practice' AND started_at>?)<4"""
+def admit(i,stamp,cutoff6,cutoff24):
+ conn.execute(session_sql,(str(i),user,'practice','free',i,'practice',stamp,'2026-11-05T00:00:00.000Z',user,cutoff6,user,cutoff24))
+ return conn.execute('SELECT changes()').fetchone()[0]
+assert admit('a',origin,cutoff6,cutoff24)==1
+assert admit('b','2026-11-01T00:00:00.000Z',cutoff6,cutoff24)==0, 'parallel same-slot insert must be rejected'
+assert admit('c','2026-11-01T06:00:00.000Z',origin,cutoff24)==1
+assert admit('d','2026-11-01T12:00:00.000Z','2026-11-01T06:00:00.000Z',cutoff24)==1
+assert admit('e','2026-11-01T18:00:00.000Z','2026-11-01T12:00:00.000Z',cutoff24)==1
+assert admit('f','2026-11-01T23:00:00.000Z','2026-11-01T17:00:00.000Z',cutoff24)==0, 'fifth practice within 24h rejected'
+test_sql="""INSERT INTO study_sessions(id,user_id,category,kind,day,mode,started_at,expires_at)
+SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM study_sessions WHERE user_id=? AND category='test' AND started_at>?)"""
+params=lambda i,t,limit:(str(i),user,'test','weekly',7,'exam',t,'2026-11-15T00:00:00.000Z',user,limit)
+conn.execute(test_sql,params('test1',origin,'2026-10-25T00:00:00.000Z'))
+assert conn.execute('SELECT changes()').fetchone()[0]==1
+conn.execute(test_sql,params('test2','2026-11-05T00:00:00.000Z','2026-10-29T00:00:00.000Z'))
+assert conn.execute('SELECT changes()').fetchone()[0]==0
+print('PASS: atomic D1 practice slot admission, fifth practice denial and seven-day test lock')

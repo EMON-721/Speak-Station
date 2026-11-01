@@ -34,6 +34,8 @@ jobs:
         run: node scripts/tests/verify-speaking-parts.mjs
       - name: Preserve core learner-facing features
         run: node scripts/tests/verify-features.mjs
+      - name: Test 6-hour practice and seven-day test admission boundaries
+        run: node scripts/tests/verify-session-policy.mjs
       - name: Check real 240-book content and all 45 scheduled exams
         run: node scripts/tests/verify-real-content.mjs
       - name: Verify all D1 migrations and progress storage

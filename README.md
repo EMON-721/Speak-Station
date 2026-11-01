@@ -18,6 +18,8 @@ Speak Station is a browser-based **English speaking and IELTS-style practice pla
 | Complete speaking books | **240 IELTS-style books**, each combining all three speaking parts |
 | Question collection | Thousands of speaking prompts across familiar, social and abstract topics |
 | Daily speaking | Structured practice sessions and selectable learning-track lengths |
+| Practice admission | One full three-part practice every **6 hours**, maximum **4 starts in any rolling 24 hours** |
+| Test admission | One test start every **7 days** (weekly, revision or exam-mode book), only after **2 distinct modules completed within the last 7 days** |
 | Weekly exams | **30 sequential weekly tests** with a minimum pass band of **6.0/9** |
 | Revision checkpoints | **15 revision exams**; a revision is required after every two passed weekly tests |
 | Sample mock | A **preview-only** example of speaking parts and expected timings, without starting an exam |
@@ -64,6 +66,17 @@ The speaking report is designed to show **what you said, what could improve and 
 - **Listening and copying:** convenient playback of corrected answers and copy/download options during the session.
 
 AI transcription may mishear words; an unclear recording does not justify inventing the speaker's words or pronunciation errors.
+
+## Practice and test frequency controls
+
+To protect the learning routine and API budget, all newly started sessions must be admitted by the **Cloudflare D1 server**, not merely an enabled button. A full practice containing Parts 1, 2 and 3 counts as **one** session.
+
+- **Practice:** one start at least **six hours after the previous practice start**; never more than **four starts in the preceding 24 hours**.
+- **Tests:** one start at least **seven days after the previous test start**, shared across Weekly, Revision and Book Exam modes.
+- **Required preparation:** a test needs **two distinct completed speaking modules in the preceding seven days**. Both completed Daily Modules and completed Speaking Practice Books count; simply opening questions does not count.
+- A started session consumes a slot even if abandoned, because refreshing the browser cannot bypass the time limit. An unfinished session can be resumed for the same module inside its 24-hour validity; after expiry a newly admitted slot is required.
+- Users see their current remaining time and completed module count on the home dashboard; the backend independently rechecks every start and assessment.
+- This rule works alongside the existing **6.0/9 pass score**, sequential Weekly unlocking, compulsory Revision gates and the **15-day answered-question cooldown**. None of those features was removed.
 
 ## Weekly exams and revision progression
 
