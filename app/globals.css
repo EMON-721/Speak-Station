@@ -505,3 +505,10 @@ body{background:#111214;color:#F2F3F5}
 .homepage-shell .completed-part-content p{color:#c5c9d0;line-height:1.7;font-size:13px;overflow-wrap:anywhere}
 .homepage-shell .completed-part-content>div{border-bottom:1px solid #3e424a;padding:8px 0}
 .homepage-shell .completed-part-content small{color:#b5bac1}
+
+/* Unblock Part 1 → Part 2 → Part 3 with a clear assessment CTA. */
+.homepage-shell .part-complete-action{display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #454951}
+.homepage-shell .part-complete-action .button{min-width:180px;white-space:normal;text-align:center}
+.homepage-shell .question-navigation>.button{flex-shrink:0;max-width:100%;white-space:normal}
+.homepage-shell .part-group-result{scroll-margin-top:110px}
+@media(max-width:640px){.homepage-shell .part-complete-action .button{width:100%}.homepage-shell .question-navigation>.button{flex:1 1 130px}}
