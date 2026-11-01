@@ -44,6 +44,7 @@ await page.route('**/api/**',async route=>{
  if(path==='/api/questions')return reply(route,{questions});
  if(path==='/api/content')return reply(route,{content:defaultContent});
  if(path==='/api/admin/overview')return reply(route,{administratorEmail:'qa@example.test',users:[],messages:[],activity:[]});
+ if(path==='/api/admin/part-smoke'){const data=req.postData()||'';const part=Number(data.match(/name="part"\r?\n\r?\n([123])/)?.[1]||1);return reply(route,{ok:true,part,questionCount:part===1?4:part===2?1:6,questionMappingVerified:true,model:'qa-mocked-model'})}
  if(path==='/api/admin/diagnostics')return reply(route,{checks:[{name:'Owner Google session and authorization',status:'pass',detail:'Verified test session'},{name:'Production D1 transactional write and cleanup',status:'pass',detail:'Verified test database'},{name:'AI credential available',status:'pass',detail:'Verified test provider'}],passed:3,total:3,verifiedAt:new Date().toISOString()});
  if(path==='/api/integration/test')return reply(route,{model:'qa-mocked-model',corrections:2,vocabulary:1,sampleCorrection:'I have lived here for five years.'});
  if(path==='/api/profile'){
@@ -194,12 +195,12 @@ try{
   await page.getByRole('button',{name:'Open admin workspace'}).click();
   await page.getByRole('button',{name:'Live Diagnostics'}).click();
   await page.getByRole('button',{name:/Run production Google session/}).click();
-  await page.getByText(/Production checks: 5 passed/).waitFor();
-  assert.equal(await page.locator('.admin-qa-pass').count(),5);
+  await page.getByText(/Production checks: 8 passed/).waitFor();
+  assert.equal(await page.locator('.admin-qa-pass').count(),8);
   await page.getByRole('button',{name:/Test my real microphone/}).click();
   await page.clock.runFor(4700);
   await page.getByText('Microphone-to-AI transcription passed with your device.').waitFor();
-  assert.equal(await page.locator('.admin-qa-pass').count(),6);
+  assert.equal(await page.locator('.admin-qa-pass').count(),9);
   await capture('owner-diagnostics-simulated');
   adminMode=false;
  });
