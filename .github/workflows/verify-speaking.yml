@@ -75,6 +75,11 @@ jobs:
           cache: pnpm
       - name: Install project
         run: pnpm install --frozen-lockfile
+      - name: Cache browser binaries between QA runs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ubuntu2404-playwright-1.58.2
       - name: Install isolated Playwright Chromium
         run: |
           npm install --prefix /tmp/speak-playwright --no-save --package-lock=false playwright@1.58.2
