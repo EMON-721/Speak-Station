@@ -277,6 +277,29 @@ async function handler(req:Request){
  }
  if(path.startsWith('admin')){
   if(!admin)return fail('Administrator access is required. The owner must configure the administrator email first.',403);
+  if(req.method==='POST'&&path==='admin/part-smoke'){
+   // Owner-requested, isolated REAL provider smoke test. No learner progress
+   // record, cooldown, transcript, or score is written to production D1.
+   const form=await req.formData();
+   const part=Number(form.get('part'));
+   if(![1,2,3].includes(part))return fail('Choose speaking Part 1, 2 or 3.',400);
+   const file=form.get('audio');
+   if(!(file instanceof File)||file.size<500||file.size>2*1024*1024)return fail('Use the short bundled QA audio sample (maximum 2 MB).',413);
+   const mime=audioMime(file.type);
+   if(!/^audio\/(wav|mp4|webm|ogg|mpeg)$/.test(mime))return fail('Unsupported sample audio format.',400);
+   const audio=await file.arrayBuffer();
+   if(!validAudio(audio))return fail('Invalid sample audio.',400);
+   const config=await aiConfiguration(E(),db());
+   if(!config.GEMINI_API_KEY)return fail('AI connection is not configured for the full Part assessment.',503);
+   const assigned=questions.filter(q=>q.part===part).slice(0,part===1?4:part===2?1:6);
+   if(assigned.length!==(part===1?4:part===2?1:6))return fail('The default question bank is incomplete.',503);
+   const evidence:PartAnswer[]=assigned.map(q=>({question:q,transcript:'',duration:4,audio,mime}));
+   try{
+    const feedback=await assessSpeakingPart(config,part as 1|2|3,evidence);
+    if(feedback.questionFeedback?.length!==assigned.length||feedback.questionFeedback.some((q,i)=>q.questionId!==assigned[i].id))return fail('The AI response did not preserve every question-to-answer mapping.',502);
+    return response({ok:true,part,questionCount:assigned.length,criteriaCount:Object.keys(feedback.criteria||{}).length,questionMappingVerified:true,model:String(config.AI_MODEL||'configured model'),note:'Real provider + bundled sample audio; no learner score was created or saved.'});
+   }catch(e){return fail(assessmentFailureMessage(e),502)}
+  }
   if(req.method==='GET'&&path==='admin/diagnostics'){
    // Authenticated OWNER ONLY. Uses the actual production binding and Google
    // session; never returns secrets, user records or account identifiers.
