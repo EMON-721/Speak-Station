@@ -230,3 +230,74 @@ html[data-theme=dark] .homepage-shell{--accent-ink:#9dbdf9;--surface:#282f3a;--s
 @media(max-width:650px){.homepage-shell .brand small{font-size:8px}.homepage-shell .home-footer{gap:18px;flex-wrap:wrap}.homepage-shell .home-footer p{flex-basis:100%}}
 .homepage-shell .exam-parts span{background:var(--surface);color:var(--text);border-color:var(--border)}
 .homepage-shell :is(.typed-practice span,.exam-track>span){color:var(--muted);font-size:13px;line-height:1.65}
+
+/* Decorative hero motion stays inside the existing illustration bounds. */
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-shell .hero-art .mic-orb {
+    animation: station-mic-float 6s ease-in-out infinite;
+  }
+  .homepage-shell .hero-art .orbit-one {
+    animation: station-orbit-one 36s linear infinite;
+  }
+  .homepage-shell .hero-art .orbit-two {
+    animation: station-orbit-two 44s linear infinite;
+  }
+  .homepage-shell .hero-art .bubble-top {
+    animation: station-top-note 7s ease-in-out -2s infinite;
+  }
+  .homepage-shell .hero-art .bubble-bottom {
+    animation: station-bottom-note 8s ease-in-out -4s infinite;
+  }
+  .homepage-shell .hero-art .orb-wave i {
+    transform-origin: center;
+    animation: station-voice-wave 1.8s ease-in-out infinite;
+  }
+  .homepage-shell .hero-art .orb-wave i:nth-child(5n+1) { animation-delay: -.25s; }
+  .homepage-shell .hero-art .orb-wave i:nth-child(5n+2) { animation-delay: -.8s; }
+  .homepage-shell .hero-art .orb-wave i:nth-child(5n+3) { animation-delay: -1.35s; }
+  .homepage-shell .hero-art .orb-wave i:nth-child(5n+4) { animation-delay: -.5s; }
+  .homepage-shell .hero-art .orb-wave i:nth-child(5n) { animation-delay: -1.65s; }
+  .homepage-shell .hero-art .art-star {
+    animation: station-star-drift 8s ease-in-out -1s infinite;
+  }
+  .homepage-shell .hero-art .art-spark {
+    animation: station-spark-drift 9s ease-in-out -3s infinite;
+  }
+  .homepage-shell .hero-art:hover *,
+  .homepage-shell .hero:focus-within .hero-art * {
+    animation-play-state: paused;
+  }
+}
+@keyframes station-mic-float {
+  0%, 100% { transform: translateY(0) rotate(-10deg); }
+  50% { transform: translateY(-7px) rotate(-7deg); }
+}
+@keyframes station-orbit-one {
+  from { transform: rotate(-35deg) scaleY(.76); }
+  to { transform: rotate(325deg) scaleY(.76); }
+}
+@keyframes station-orbit-two {
+  from { transform: rotate(35deg) scaleY(.76); }
+  to { transform: rotate(-325deg) scaleY(.76); }
+}
+@keyframes station-top-note {
+  0%, 100% { transform: translateY(0) rotate(6deg); }
+  50% { transform: translateY(-4px) rotate(4deg); }
+}
+@keyframes station-bottom-note {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(4px) rotate(-4deg); }
+}
+@keyframes station-voice-wave {
+  0%, 100% { transform: scaleY(.4); }
+  45% { transform: scaleY(1); }
+  70% { transform: scaleY(.65); }
+}
+@keyframes station-star-drift {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-5px) rotate(15deg); }
+}
+@keyframes station-spark-drift {
+  0%, 100% { transform: translateY(0) rotate(-20deg); }
+  50% { transform: translateY(4px) rotate(0); }
+}
