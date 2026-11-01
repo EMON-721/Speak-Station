@@ -9,7 +9,7 @@ const api=fs.readFileSync('app/api/[...path]/route.ts','utf8');
 // This is a feature-preservation contract, not a brittle test of UI wording.
 // If a core learner section is intentionally removed, change this test only
 // after explicit owner approval and a documented replacement.
-function hasSection(id){return new RegExp('id=["\\\']'+id+'["\\\']').test(ui)}
+function hasSection(id){return ui.includes('id="'+id+'"')}
 for(const id of ['home','progress','achievements','academy']){
  assert(hasSection(id),'Protected learner feature missing: '+id);
 }
