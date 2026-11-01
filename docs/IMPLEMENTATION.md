@@ -31,3 +31,13 @@ The owner CMS controls branding, copy, theme, navigation, sections, cards, topic
 ## Verification
 
 Isolated API tests exercise the actual route handler with SQLite/object-store adapters and mocked provider transport. They verify zero new answer/audio/feedback storage, actual daily assessment/review/completion flow, signed receipt integrity and ownership, duplicates, expiry, typed/unreviewed rejection, stage replay rejection and the 6.0 fail/6.5 pass boundary. Existing checks cover encrypted credentials, quota errors, transcription, full-bank question CRUD, CMS conflicts, owner protections and private support messages. Assessment tests check provider JSON parsing, complete-answer output and text-only score restrictions. Browser QA covers the actual report, visible assessment controls and responsive layout. Real-device microphone permission and actual provider speed are separate runtime conditions.
+
+
+## Complete Speaking Test Books (2026-11-01)
+
+- New dedicated complete-book library: 240 deterministic book sets. Each is **4 Part 1 interview prompts + 1 Part 2 cue card + 6 Part 3 discussion prompts**. They are grouped by shared topic from the maintained existing bank (rather than replacing existing standalone questions or cloning sample prompts). A book contains 11 distinct question IDs, and can be used in practice or mock exam mode.
+- Per-question browser question speech (UK/US/AU), recording, live transcript, Gemini AI feedback, grammar correction and comments reuse the existing validated assessment engine. A test is complete only after all 11 audio answers are assessed and reviewed.
+- The existing server receipt-based overall estimate is kept (no hard-coded 5.5). Session review adds part-wise estimates using completed **audio-supported** criteria. Parts with incomplete audio or incomplete criteria show "Insufficient audio".
+- Signed-out users cannot access the protected question endpoints; the new prominent AI warning says that speech recognition, comments and scores may be wrong, and are not official IELTS results.
+- Template theme updated to charcoal and copper (no blue/green brand colors), with a matching warm waveform favicon. Admin-stored theme settings may still override some dynamic content; the site uses the new book UI outside CMS-managed sections.
+- Existing daily lessons, weekly/revision progression, original question bank and account data remain available. Detailed audio/transcripts still follow current tab-only data retention policy. This is not a 7-day cloud recording archive.
