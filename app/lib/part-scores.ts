@@ -17,8 +17,17 @@ export function summarizeSpeakingParts(receipts:PracticeReceipt[],questions:Ques
   perCriterion.forEach((v,i)=>criterionParts[i].push(v));
   partScores[part]=Math.round(perCriterion.reduce((sum,v)=>sum+v,0)/4*2)/2;
  }
+ const issues={grammar:0,vocabulary:0,pronunciation:0,fluency:0,spelling:0,ideas:0};
+ let durationSeconds=0;
+ for(const part of [1,2,3]){
+  const group=questions.filter(q=>q.part===part);
+  const proof=group.length?byId.get(group[0].id):null;
+  if(!proof)continue;
+  for(const k of Object.keys(issues) as (keyof typeof issues)[])issues[k]+=proof.issues?.[k]||0;
+  durationSeconds+=proof.durationSeconds||0;
+ }
  const complete=[1,2,3].every(p=>partScores[p]!==null);
  const band=complete?Math.round([1,2,3].reduce((sum,p)=>sum+(partScores[p]||0),0)/3*2)/2:null;
  const criteria=Object.fromEntries(['fluency','lexical','grammar','pronunciation'].map((k,i)=>[k,complete?Math.round(criterionParts[i].reduce((a,b)=>a+b,0)/3*2)/2:null]));
- return {band,partScores,criteria,passed:band!==null&&band>=threshold,threshold,answers:receipts.length,label:'Unverified AI practice estimate',message:complete?(band!>=threshold?'Practice pass threshold met.':'Review your weaker parts and try again.'):'Insufficient clear audio evidence to score all three speaking parts.'};
+ return {band,partScores,criteria,issues,durationSeconds,passed:band!==null&&band>=threshold,threshold,answers:receipts.length,label:'Unverified AI practice estimate',message:complete?(band!>=threshold?'Practice pass threshold met.':'Review your weaker parts and try again.'):'Insufficient clear audio evidence to score all three speaking parts.'};
 }

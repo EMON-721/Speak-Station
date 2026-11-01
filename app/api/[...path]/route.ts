@@ -25,6 +25,24 @@ const parse=(s:any,fallback:any=null)=>{try{return JSON.parse(s)}catch{return fa
 async function rows(sql:string,...args:any[]){return (await db().prepare(sql).bind(...args).all()).results as any[];}
 async function execute(sql:string,...args:any[]){return db().prepare(sql).bind(...args).run();}
 async function allQuestions(){const changes=await rows('SELECT * FROM question_overrides');const map=new Map(questions.map(q=>[q.id,q]));for(const c of changes){if(c.archived)map.delete(c.id);else map.set(c.id,parse(c.data));}return [...map.values()];}
+
+function compactIssueCounts(feedback:any){
+ const issues={grammar:0,vocabulary:0,pronunciation:0,fluency:0,spelling:0,ideas:0};
+ for(const item of (feedback.corrections||[]).slice(0,40)){
+  const category=String(item.category||'').toLowerCase();
+  if(/spelling|orthograph/.test(category)){// Spoken audio cannot establish written spelling: avoid false claims.
+   continue;
+  }
+  if(/pronunci|sound|stress|intonation/.test(category))issues.pronunciation++;
+  else if(/fluency|coheren|hesita|repetit/.test(category))issues.fluency++;
+  else if(/vocab|lexical|word choice|collocat/.test(category))issues.vocabulary++;
+  else issues.grammar++;
+ }
+ issues.vocabulary+=Math.min(15,(feedback.vocabulary||[]).length);
+ issues.ideas=Math.min(20,(feedback.gaps||[]).length);
+ return issues;
+}
+
 async function activeCooldowns(uid:string){
  await execute('DELETE FROM question_cooldowns WHERE available_at<=?',now());
  return rows('SELECT question_id,available_at FROM question_cooldowns WHERE user_id=? AND available_at>?',uid,now());
@@ -164,9 +182,10 @@ async function handler(req:Request){
   try{
    const feedback=await assessSpeakingPart(config,meta.part,answers);
    const scores=['fluency','lexical','grammar','pronunciation'].map(k=>(feedback.criteria as any)[k].score);
+   const issues=compactIssueCounts(feedback),durationSeconds=Math.round(answers.reduce((total,item)=>total+item.duration,0));
    const receipts=await Promise.all(answers.map(async item=>{
     const id=crypto.randomUUID();
-    const receipt=await issueReceipt({id,userId:uid,questionId:item.question.id,kind:meta.kind,day:meta.day,recorded:true,reviewed:true,scores,exp:Date.now()+12*3600000},receiptSecret());
+    const receipt=await issueReceipt({id,userId:uid,questionId:item.question.id,kind:meta.kind,day:meta.day,recorded:true,reviewed:true,scores,issues,durationSeconds,exp:Date.now()+12*3600000},receiptSecret());
     return {id,questionId:item.question.id,receipt};
    }));
    if(meta.kind==='free'){
@@ -212,7 +231,7 @@ async function handler(req:Request){
   const mode=b.bookMode||'practice';
   await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',
    crypto.randomUUID(),uid,b.bookNumber,mode==='exam'?'book-exam':'book',
-   JSON.stringify({bookId:book.id,topic:book.topic,practiceBand:result.band,partScores,criteria:result.criteria,passed:result.passed,mode}),now());
+   JSON.stringify({bookId:book.id,topic:book.topic,practiceBand:result.band,partScores,criteria:result.criteria,issues:result.issues,durationSeconds:result.durationSeconds,answers:valid.length,passed:result.passed,mode}),now());
   return response({...result,partScores,bookNumber:b.bookNumber});
  }
  if(req.method==='POST'&&path==='complete-stage'){
@@ -238,7 +257,7 @@ async function handler(req:Request){
   if(valid.length!==assigned.length||new Set(valid.map(r=>r.questionId)).size!==assigned.length||!assigned.every(q=>valid.some(r=>r.questionId===q.id)))return fail('All assigned answers must have completed Part assessments.',409);
   const threshold=kind==='daily'?context.content.passBand:WEEKLY_PASS_BAND;
   const result=summarizeSpeakingParts(valid,assigned,threshold);
-  const summary={passed:result.passed,practiceBand:result.band,partScores:result.partScores};
+  const summary={passed:result.passed,practiceBand:result.band,partScores:result.partScores,criteria:result.criteria,issues:result.issues,durationSeconds:result.durationSeconds,answers:valid.length};
   if(kind==='daily'){
    await execute('INSERT OR IGNORE INTO days (user_id,day,completed_at) VALUES (?,?,?)',uid,day,now());
    await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',crypto.randomUUID(),uid,day,'daily-score',JSON.stringify(summary),now());
