@@ -211,6 +211,19 @@ export default function Workspace(){
  }
 
  useEffect(()=>{if(feedback||assessmentError){const frame=requestAnimationFrame(()=>document.getElementById('feedback-report')?.scrollIntoView({behavior:'smooth',block:'start'}));return()=>cancelAnimationFrame(frame);}},[feedback,assessmentError]);
+ useEffect(()=>{
+  if(!session)return;
+  const expire=()=>{
+   cancelTranscription();clearPartSession();setSession(null);setAudio(null);setAudioUrl('');setTranscript('');setFeedback(null);
+   if(audioUrlRef.current){URL.revokeObjectURL(audioUrlRef.current);audioUrlRef.current=''}
+   notify('Temporary speaking session and recordings expired after 24 hours. Completed scores remain in My Progress.');
+  };
+  const timeLeft=86400000-(Date.now()-sessionCreatedAt.current);
+  if(timeLeft<=0){expire();return}
+  const timer=setTimeout(expire,timeLeft);
+  return()=>clearTimeout(timer);
+ },[session]);
+
  async function connectAI(){if(!integrationKey.trim()){setConnectionMessage('Paste your Google AI Studio key in the secure field.');return}setConnectionBusy(true);setConnectionMessage('Checking your Gemini connection…');try{const result=await api('integration',{key:integrationKey.trim()});setIntegrationKey('');await refresh();setConnectionMessage('Connected successfully. Model: '+result.model+'. Record an answer to test your personal feedback.')}catch(e){setIntegrationKey('');setConnectionMessage((e as Error).message)}finally{setConnectionBusy(false)}}
  async function testAudioConnection(){setConnectionBusy(true);setConnectionMessage('Transcribing a short synthetic voice sample. This does not create a learning attempt…');try{const sample=await fetch('/transcription-check.wav');if(!sample.ok)throw new Error('The audio test sample could not load.');const f=new FormData();f.append('audio',new Blob([await sample.arrayBuffer()],{type:'audio/wav'}),'transcription-check.wav');f.append('language','auto');const result=await api('transcribe',f);if(!result.transcript?.trim())throw new Error('No speech was detected in the audio test. Please retry.');setConnectionMessage('Audio transcription test passed. Recognised words: '+(result.transcript||'[no speech detected]'));}catch(e){setConnectionMessage((e as Error).message);}finally{setConnectionBusy(false);}}
  async function testSavedConnection(){setConnectionBusy(true);setConnectionMessage('Running a real Gemini feedback test. This will not create a learning attempt…');try{const result=await api('integration/test',{});setConnectionMessage(`Assessment test passed with ${result.model}. Returned ${result.corrections} sentence corrections and ${result.vocabulary} vocabulary suggestions.${result.sampleCorrection?' Sample correction: '+result.sampleCorrection:''}`)}catch(e){setConnectionMessage((e as Error).message)}finally{setConnectionBusy(false)}}
