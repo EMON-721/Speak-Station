@@ -39,7 +39,7 @@ pnpm run build:cloudflare
 pnpm run deploy:cloudflare
 ```
 
-The build omits R2. The separate deployment file is `wrangler.cloudflare.jsonc`; do not deploy the native Sites-generated configuration to your own account. The deploy command refuses the included placeholder database ID, address and owner email. For Cloudflare Git integration, use `pnpm run build:cloudflare` as the build command and `pnpm run deploy:cloudflare` as the deploy command, and add the same D1 settings and secrets first.
+The build omits R2. The separate deployment file is `wrangler.cloudflare.jsonc`; do not deploy the native Sites-generated configuration to your own account. For the full app, the deploy command requires a real D1 database ID, address and owner email. An initial fully unconfigured run can publish the separate setup page only. For Cloudflare Git integration, use `pnpm run build:cloudflare` as the build command and `pnpm run deploy:cloudflare` as the deploy command, and add the same D1 settings and secrets first.
 
 After deploying, sign in with the configured owner's Google account. Open **Admin → AI connection**, securely connect your Gemini key and run its connection test. Google's Gemini quota and billing settings remain independent; this project does not enable a paid Google plan.
 
@@ -76,6 +76,20 @@ These are build-time inputs. The deployment script validates them and creates an
 
 The `SPEAK_*` build variables are **not** Worker runtime secrets. Once the Worker exists, set `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `CREDENTIAL_ENCRYPTION_KEY` in **Worker → Settings → Variables & Secrets**, as encrypted secrets. Set Google's authorized OAuth redirect URI to exactly `SPEAK_APP_ORIGIN/callback`. Do not paste API tokens, OAuth client secrets, or encryption keys in the Git repository or chat.
 
-Create the D1 database first from Cloudflare D1 before launching this build. The deploy command above runs all unapplied migrations against the new database before publishing. The configured build token must allow D1 access for this operation, otherwise migration fails safely and prevents a broken deployment. If you use a token that can only deploy Workers, perform the database migration separately with an authorized Wrangler session, then set the deploy command to `pnpm run deploy:cloudflare`.
+Create the D1 database before launching the **full application** (not required for the temporary setup page). The deploy command above runs all unapplied migrations against the new database before publishing. The configured build token must allow D1 access for this operation, otherwise migration fails safely and prevents a broken deployment. If you use a token that can only deploy Workers, perform the database migration separately with an authorized Wrangler session, then set the deploy command to `pnpm run deploy:cloudflare`.
 
 Cloudflare Workers Builds variables are build-only; configured `vars` and Worker Secrets are provided to the running Worker. Deployment is **not** complete until Google OAuth, Worker Secrets, and the owner-managed Gemini connection have been configured and tested.
+
+
+## Temporary first deployment without a database
+
+If you want a Cloudflare website address now and prefer to set up D1 and Google sign-in later, keep **all three** `SPEAK_D1_DATABASE_ID`, `SPEAK_APP_ORIGIN` and `SPEAK_ADMIN_EMAIL` **unset**. The commands remain:
+
+- Build: `pnpm run build:cloudflare`
+- Deploy: `pnpm run db:migrate:cloudflare && pnpm run deploy:cloudflare`
+
+When all three are absent, the D1 migration logs **SETUP PENDING** and skips database changes, and the deploy script publishes a minimal **Speak Station — Setup in Progress** page at the `speak-station` Worker. This setup page is publicly viewable but **does not offer learner login, the admin workspace, AI feedback, or speaking practice**. It does not create fake D1 databases or credentials. The first deployment still requires a Cloudflare account, a workers.dev subdomain and a token authorized to deploy Workers.
+
+When ready to activate the complete app, create D1 `speak-station-free`, add **all three** real build variables, configure the verified Google OAuth client and its redirect URI, and add the runtime Worker secrets listed above. The existing deploy command will then apply D1 migrations and publish the full Worker with the **same worker name/address**. At that point the build API token also requires D1 edit permission, and the real app needs a successful runtime check.
+
+**Important safety rule:** a partial configuration with only one or two of the three required build variables will fail instead of silently overwriting an existing live application with the temporary setup page. Remove all three to request setup mode or add all three for full mode. Don't mistake a successful setup-page deploy for a tested Speak Station release.
