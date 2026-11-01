@@ -46,7 +46,7 @@ assert(frontend.includes("if(audio&&elapsed>=3){await saveQuestionAndContinue();
 assert(frontend.includes("const nextPart=session.list.findIndex(q=>q.part>part)"),'completed part navigates directly to the next speaking part');
 assert(frontend.includes("disabled={recording||busy||(!answered(selected.id)&&!audio&&!partReports[selected.part])}"),'Next question is available for a recorded but not yet saved answer');
 assert(frontend.includes("session-side-panel")&&frontend.includes("Continue to Part "),'completed part has a visible sidebar continue button');
-assert(frontend.includes("'Ready to save'"),'unsaved audio has a clear status');
+assert(frontend.includes("'Ready'"),'unsaved audio has a clear status');
 assert(frontend.includes("assessCompletedPart"),'part assessment exists');
 assert(backend.includes("expected.some((q,i)=>q.id!==ids[i])"),'server validates complete assigned part');
 assert(backend.includes("summarizeSpeakingParts(valid,assigned"),'daily/weekly final score covers all parts');
