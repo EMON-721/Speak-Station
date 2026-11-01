@@ -54,3 +54,34 @@ assert(assessment.includes("One authenticated Gemini generation")&&assessment.in
 const css=fs.readFileSync('app/globals.css','utf8');
 assert(css.includes("/* November: keep the book explorer"),'book explorer CSS regression fix');
 console.log('PASS: 240 books, 3-part composition, band computation, incomplete evidence, UI/backend routing, CSS markers');
+
+const {normalizePartQuestionReviews}=loadTs('app/lib/question-reviews.ts');
+const expected=[
+ {question:{id:'q1',text:'Where do you live?'},transcript:'I live near the city.'},
+ {question:{id:'q2',text:'What do you like about your city?'},transcript:'I like its parks.'},
+ {question:{id:'q3',text:'Do you talk about it with friends?'},transcript:'Sometimes with my friends.'},
+ {question:{id:'q4',text:'What would you change?'},transcript:'I would improve buses.'}
+];
+const unsorted=[
+ {questionId:'q4',transcript:'Audio answer four.',correctedAnswer:'I would improve the buses.',comment:'Clear choice.'},
+ {questionId:'q1',transcript:'Audio answer one.',correctedAnswer:'I live near the city.',comment:'Good start.'},
+ {questionId:'unexpected',correctedAnswer:'Wrong correction from a different question.'},
+ {questionId:'q2',transcript:'Audio answer two.',correctedAnswer:'I like the parks.',comment:'Explain why.'}
+];
+const aligned=normalizePartQuestionReviews(unsorted,expected);
+assert.deepEqual(aligned.map(a=>a.questionId),['q1','q2','q3','q4'],'question order follows the test, not the AI response');
+assert.equal(aligned[0].correctedAnswer,'I live near the city.','first correction stays with question 1');
+assert.equal(aligned[1].correctedAnswer,'I like the parks.','second correction stays with question 2');
+assert.equal(aligned[2].correctedAnswer,null,'missing correction must never be guessed or borrowed');
+assert.equal(aligned[2].transcript,'Sometimes with my friends.','missing AI transcript falls back to recorded browser transcript');
+assert.equal(aligned[3].correctedAnswer,'I would improve the buses.','fourth correction stays with question 4');
+const prompt=fs.readFileSync('app/lib/part-assessment.ts','utf8');
+const report=fs.readFileSync('app/feedback-report.tsx','utf8');
+const cards=fs.readFileSync('app/question-answer-cards.tsx','utf8');
+assert(prompt.includes('questionFeedback')&&prompt.includes('exact questionId'),'one-part Gemini prompt requests stable per-question answer grouping');
+assert(frontend.includes('questionReviews={partReports[selected.part]?questionReviewsForPart(selected.part):[]}'),'Part report sends aligned answers to feedback renderer');
+assert(frontend.includes('<QuestionAnswerCards answers={questionReviewsForPart(p)}'),'previous parts keep their grouped answers');
+assert(report.includes('<QuestionAnswerCards answers={questionReviews}'),'full answer tab displays per-question cards');
+assert(cards.includes('Your original answer')&&cards.includes('Your corrected answer'),'each card separates original and corrected spoken answers');
+console.log('PASS: distinct question/answer mapping, missing model review fallback, and question-specific corrected-answer UI');
+
