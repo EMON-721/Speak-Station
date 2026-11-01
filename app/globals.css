@@ -677,3 +677,14 @@ body{background:#111214;color:#F2F3F5}
 .admin-console .admin-qa-fail{border-left:3px solid #df8c8c!important}
 .admin-console .admin-qa-manual{border-left:3px solid #afbac9!important}
 @media(max-width:700px){.admin-console .admin-qa-results{grid-template-columns:1fr}.admin-console .admin-qa-actions button{width:100%}}
+
+
+/* Speaking admission limits are visible but do not hide existing learner features. */
+.homepage-shell .session-limit-panel{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 22px;margin:15px 0 20px;padding:15px 18px;background:#24272c;border:1px solid #424750;border-radius:13px}
+.homepage-shell .session-limit-panel>div:first-child{display:flex;flex-direction:column;gap:6px;max-width:620px}
+.homepage-shell .session-limit-panel strong{display:flex;gap:8px;align-items:center;color:#f1f3f5;font-size:13px}
+.homepage-shell .session-limit-panel span{color:#c9cdd4;font-size:12px;line-height:1.5}
+.homepage-shell .session-limit-counters{display:flex;flex-wrap:wrap;gap:8px}
+.homepage-shell .session-limit-counters span{display:inline-block;padding:7px 10px;border:1px solid #454b54;border-radius:8px;font-size:11px;color:#edf0f4;background:#30343b}
+.homepage-shell .session-limit-panel p{width:100%;margin:0;font-size:12px;line-height:1.55;color:#ecdbbd}
+@media(max-width:680px){.homepage-shell .session-limit-panel{padding:13px}.homepage-shell .session-limit-counters{width:100%}}
