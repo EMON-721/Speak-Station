@@ -142,6 +142,46 @@ try{
   }
   await capture('detailed-feedback');
  });
+
+ await verify('Complete Part 1 → Part 2 → Part 3 → final score with simulated microphone and AI',async()=>{
+  await page.goto(ORIGIN,{waitUntil:'domcontentloaded'});
+  await page.locator('#home').waitFor({state:'visible'});
+  await page.getByRole('button',{name:/Start speaking practice/}).click();
+  await page.locator('#practice').waitFor({state:'visible'});
+  for(const [part,count] of [[1,4],[2,1],[3,6]]){
+   if(part===2){
+    await page.locator('.session-side-panel').getByRole('button',{name:/Continue to Part 2/}).click();
+    await page.clock.runFor(61000);
+   }
+   if(part===3){
+    await page.locator('.session-side-panel').getByRole('button',{name:/Continue to Part 3/}).click();
+   }
+   for(let index=0;index<count;index++){
+    const zone=page.locator('#practice .recorder-zone');
+    await zone.getByRole('button',{name:/Start speaking/}).click();
+    await page.clock.runFor(4100);
+    await zone.getByRole('button',{name:/Finish recording/}).click();
+    await page.locator('#practice .audio-playback').waitFor({state:'visible'});
+    const save=page.locator('#practice .submit-area button');
+    await save.waitFor({state:'visible'});
+    assert(await save.isEnabled(),'recording should unlock save');
+    await save.click();
+    if(index===count-1){
+     await page.locator('#feedback-report .assessment-summary').waitFor({state:'visible'});
+     assert.equal(assessmentCalls[part],1,'one AI request per finished Part '+part);
+     const cards=page.locator('#feedback-report .question-answer-card');
+     if(!(await cards.count()))await page.getByRole('tab',{name:/Full answer/}).click();
+     assert.equal(await page.locator('#feedback-report .question-answer-card').count(),count,'each question keeps a separate original/corrected response');
+    }
+   }
+  }
+  await page.locator('.session-side-panel').getByRole('button',{name:/View final result/}).click();
+  await page.locator('.modal[role="dialog"] .practice-result').waitFor({state:'visible'});
+  assert((await page.locator('.modal[role="dialog"] .practice-result').innerText()).includes('6.0 / 9'));
+  for(const part of [1,2,3])assert.equal(assessmentCalls[part],1,'no repeated Part '+part+' assessment');
+  await capture('complete-three-part-mock');
+ });
+
  assert.equal(browserErrors.length,0,'No JavaScript page crashes: '+browserErrors.slice(0,3).join(' | '));
  record('No uncaught browser JavaScript errors','PASS');
 }catch(error){console.log('Browser suite stopped at first failed control; see screenshots and error above.');process.exitCode=1}
