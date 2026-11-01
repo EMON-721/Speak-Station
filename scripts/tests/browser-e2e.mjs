@@ -194,7 +194,7 @@ try{
   await page.locator('.owner-bar').waitFor({state:'visible'});
   await page.getByRole('button',{name:'Open admin workspace'}).click();
   await page.getByRole('button',{name:'Live Diagnostics'}).click();
-  await page.getByRole('button',{name:/Run production Google session/}).click();
+  await page.getByRole('button',{name:/Run live production checks/}).click();
   await page.getByText(/Production checks: 8 passed/).waitFor();
   assert.equal(await page.locator('.admin-qa-pass').count(),8);
   await page.getByRole('button',{name:/Test my real microphone/}).click();
