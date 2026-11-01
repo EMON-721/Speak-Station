@@ -29,3 +29,9 @@ Account actions require a reason and create an audit entry. Ban blocks access, i
 A test-pass override records the administrator, reason, test type and milestone. It is labelled as an administrative override, not an AI score. Overrides do not invent a band estimate.
 
 Learners send support messages from the bottom of the homepage. Read and reply in **Messages**. Replies are visible only to that learner and administrators. Account management and support messages require verified sign-in; no public learner directory is exposed.
+
+## Progress-only practice storage
+
+New audio, transcripts, detailed feedback, notes and revision items stay in the current tab only, including items marked for review. Download a report before reloading or closing the tab. An unfinished daily or exam session must be restarted after reload. Completed days and passed test milestones survive sign-in on another device. Server-signed assessment proofs enforce the recording, review and 6.5/9 test requirements without storing answers. The proof lasts 12 hours and contains only IDs, stage, four criterion scores and review flags.
+
+The Start speaking agreement modal is removed. The recording controls explain provider processing inline, and browser microphone permission still applies. Assessment is available immediately when recording stops; final transcription does not block it. The report starts with the full original answer followed by one connected corrected answer, then a developed version and contextual explanations. Grammar, missing ideas, vocabulary, pronunciation/fluency and next steps each have a named tab. Typed feedback does not claim pronunciation evidence. Existing saved records are not automatically deleted.

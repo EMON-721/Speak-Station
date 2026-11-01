@@ -1,0 +1,2 @@
+// Legacy feedback can reconstruct a complete correction from exact learner excerpts.
+export function fullCorrectedAnswer(original:string,feedback:any){if(feedback?.correctedAnswer?.trim())return feedback.correctedAnswer;let corrected=original;for(const change of feedback?.corrections||[])if(change.original?.trim()&&change.corrected?.trim())corrected=corrected.replace(change.original,change.corrected);return corrected;}

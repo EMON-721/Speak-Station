@@ -1,3 +1,4 @@
+import {issueReceipt,readReceipt,receiptResult,type PracticeReceipt} from '../../lib/practice-receipts';
 import {readContent,contentSchema,estimatedBand,stageQuestions} from '../../lib/content';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
@@ -10,6 +11,8 @@ import {assessmentFailureMessage,ProviderFailure} from '../../lib/provider-error
 import {aiConfiguration,connectionStatus,encryptCredential,verifyGemini} from '../../lib/integration';
 export const dynamic='force-dynamic';
 const E=()=>env as any;
+const receiptSecret=()=>String(E().PRACTICE_RECEIPT_SECRET||E().CREDENTIAL_ENCRYPTION_KEY||'');
+const proof=(value:unknown,userId:string)=>readReceipt(value,receiptSecret(),userId);
 const response=(v:any,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const fail=(msg:string,status=400)=>response({error:msg},status);
 const now=()=>new Date().toISOString();
@@ -18,13 +21,14 @@ const parse=(s:any,fallback:any=null)=>{try{return JSON.parse(s)}catch{return fa
 async function rows(sql:string,...args:any[]){return (await db().prepare(sql).bind(...args).all()).results as any[];}
 async function execute(sql:string,...args:any[]){return db().prepare(sql).bind(...args).run();}
 async function allQuestions(){const changes=await rows('SELECT * FROM question_overrides');const map=new Map(questions.map(q=>[q.id,q]));for(const c of changes){if(c.archived)map.delete(c.id);else map.set(c.id,parse(c.data));}return [...map.values()];}
+async function learningContext(uid:string){const [profiles,days,tests,content]=await Promise.all([rows('SELECT track FROM profiles WHERE user_id=?',uid),rows('SELECT day FROM days WHERE user_id=?',uid),rows('SELECT kind,milestone FROM tests WHERE user_id=?',uid),readContent(db())]);return {content,stage:nextStage(days.map(d=>d.day),tests,profiles[0]?.track||210,content.exams)};}
 async function state(user:any){
  const authProvider=E().AUTH_MODE==='google'?'Google':'ChatGPT';const connection=await connectionStatus(E(),db());const content=await readContent(db());const revisionRow=await rows("SELECT value FROM settings WHERE key='site_content_revision'");const contentRevision=Number(revisionRow[0]?.value||0);
- if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,connection,storageReady:!!E().DB,audioStorageReady:!!E().BUCKET,isAdmin:false};
+ if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,connection,storageReady:!!E().DB,audioStorageReady:false,learningStorage:'progress-only',isAdmin:false};
  await execute('INSERT OR IGNORE INTO profiles (user_id,name,track,created_at) VALUES (?,?,?,?)',user.userId,user.displayName,210,now());
  const [profiles,attempts,saved,days,tests]=await Promise.all([rows('SELECT * FROM profiles WHERE user_id=?',user.userId),rows('SELECT * FROM attempts WHERE user_id=? ORDER BY created_at DESC LIMIT 500',user.userId),rows('SELECT * FROM saved WHERE user_id=?',user.userId),rows('SELECT * FROM days WHERE user_id=? ORDER BY day',user.userId),rows('SELECT * FROM tests WHERE user_id=?',user.userId)]);
  const complete=days.map(d=>d.day);
- return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{name:user.displayName,email:user.email},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,tests,streak:streak(attempts.map(a=>a.created_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:!!E().BUCKET,isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
+ return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
 }
 async function handler(req:Request){
  const path=new URL(req.url).pathname.replace(/^\/api\//,'');const user=await getChatGPTUser();
@@ -87,75 +91,43 @@ async function handler(req:Request){
  }
  if(path==='submit'&&req.method==='POST'){
   const config=await aiConfiguration(E(),db());if(!(config.OPENAI_API_KEY||config.GEMINI_API_KEY))return fail('Connect Google AI Studio in AI connection first. Your recording stays on this device.',503);
-  const f=await req.formData();const q=(await allQuestions()).find(q=>q.id===String(f.get('questionId')));if(!q)return fail('Question not found.',404);
+  const f=await req.formData();const bank=await allQuestions();const q=bank.find(q=>q.id===String(f.get('questionId')));if(!q)return fail('Question not found.',404);
   const audio=f.get('audio');const typed=String(f.get('typed')||'').slice(0,20000);const transcript=String(f.get('transcript')||'').slice(0,20000);const duration=Math.round(Number(f.get('duration')||0));const kind=String(f.get('kind')||'free'),day=Number(f.get('day')||0);const hasAudio=audio instanceof File;
   if(!['free','daily','weekly','revision'].includes(kind))return fail('Invalid practice type.');
   if(hasAudio){if(audio.size<500||audio.size>8*1024*1024||!/^audio\/(webm|ogg|mp4|wav|mpeg)/.test(audio.type))return fail('Use an audio file of up to 8 MB.');if(!Number.isFinite(duration)||duration<3||duration>900)return fail('Record at least 3 seconds.');}
   else if(/[\u0980-\u09ff]/.test(typed))return fail('Please write your speaking answer in English.');
   else if(typed.trim().length<15)return fail('Record an answer or enter at least 15 characters for text-only feedback.');
-  if(kind!=='free'){if(!hasAudio)return fail('A recorded answer is required for this learning stage.',409);const s=await state(user);if(s.stage.type!==kind||s.stage.day!==day)return fail('Finish your current learning stage first.',409);const active=await allQuestions();if(!(kind==='daily'?dailyQuestions(day,active):stageQuestions(day,kind,active,await readContent(db()),examQuestions)).some(v=>v.id===q.id))return fail('This question is not assigned to this stage.',409);}
+  if(kind!=='free'){if(!hasAudio)return fail('A recorded answer is required for this learning stage.',409);const s=await learningContext(uid);if(s.stage.type!==kind||s.stage.day!==day)return fail('Finish your current learning stage first.',409);if(!(kind==='daily'?dailyQuestions(day,bank):stageQuestions(day,kind,bank,s.content,examQuestions)).some(v=>v.id===q.id))return fail('This question is not assigned to this stage.',409);}
   const date=now().slice(0,10),limit=Math.max(1,Math.min(100,Number(E().DAILY_AI_LIMIT)||20));const used=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,date,limit);if(!used.meta.changes)return fail('Daily assessment limit reached. Try again tomorrow.',429);
-  try{const bytes=hasAudio?await audio.arrayBuffer():null;if(bytes){const b=new Uint8Array(bytes);const valid=(b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)||String.fromCharCode(...b.subarray(0,4))==='OggS'||String.fromCharCode(...b.subarray(0,4))==='RIFF'||String.fromCharCode(...b.subarray(4,8))==='ftyp';if(!valid)return fail('This file is not a supported audio recording.');}const feedback=await assess(config,q,hasAudio?transcript:typed,bytes,hasAudio?audio.type:'');if(hasAudio&&((feedback.transcript||transcript).replace(/\[unclear\]/gi,'').trim().length<5))return fail('No clear spoken answer was detected. Try recording again in a quieter place.',422);const id=crypto.randomUUID();const keep=f.get('keepAudio')==='true'&&hasAudio;const key=keep?`${uid}/${id}`:'';if(keep){if(!E().BUCKET)return fail('Optional audio storage is unavailable.',503);await E().BUCKET.put(key,bytes,{httpMetadata:{contentType:audio.type}});}
-   await execute("INSERT INTO attempts (id,user_id,question_id,kind,day,status,duration,audio_key,mime,transcript,feedback,created_at) VALUES (?,?,?,?,?,'evaluated',?,?,?,?,?,?)",id,uid,q.id,kind,day,hasAudio?duration:0,key,hasAudio?audio.type:'text/plain',hasAudio?(feedback.transcript||transcript):typed,JSON.stringify(feedback),now());return response({id,feedback,audioSaved:keep,textOnly:!hasAudio});
+  try{const bytes=hasAudio?await audio.arrayBuffer():null;if(bytes){const b=new Uint8Array(bytes);const valid=(b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)||String.fromCharCode(...b.subarray(0,4))==='OggS'||String.fromCharCode(...b.subarray(0,4))==='RIFF'||String.fromCharCode(...b.subarray(4,8))==='ftyp';if(!valid)return fail('This file is not a supported audio recording.');}const feedback=await assess(config,q,hasAudio?transcript:typed,bytes,hasAudio?audio.type:'');if(hasAudio&&((feedback.transcript||transcript).replace(/\[unclear\]/gi,'').trim().length<5))return fail('No clear spoken answer was detected. Try recording again in a quieter place.',422);const id=crypto.randomUUID();
+   const receipt=await issueReceipt({id,userId:uid,questionId:q.id,kind,day,recorded:hasAudio,reviewed:false,scores:['fluency','lexical','grammar','pronunciation'].map(k=>(feedback.criteria as any)[k].score),exp:Date.now()+12*3600000},receiptSecret());
+   return response({id,receipt,feedback,audioSaved:false,textOnly:!hasAudio,storage:'session-only'});
   }catch(e){return fail(assessmentFailureMessage(e),502);}
  }
- if(req.method==='POST'&&path==='record'){
-  if(!E().BUCKET)return fail('Recording storage is not available yet.',503);
-  const f=await req.formData();const audio=f.get('audio');const id=String(f.get('questionId'));const q=(await allQuestions()).find(q=>q.id===id);if(!q)return fail('Question not found.',404);
-  if(!(audio instanceof File)||audio.size<500||audio.size>8*1024*1024||!/^audio\/(webm|ogg|mp4|wav|mpeg)/.test(audio.type))return fail('Upload a valid audio recording (up to 8 MB).');
-  const duration=Math.round(Number(f.get('duration')));if(!Number.isFinite(duration)||duration<3||duration>900)return fail('Please record between 3 seconds and 15 minutes.');
-  const transcript=String(f.get('transcript')||'').slice(0,20000);const kind=String(f.get('kind')||'free');const day=Number(f.get('day')||0);
-  if(!['free','daily','weekly','revision'].includes(kind))return fail('Invalid practice type.');
-  if(kind!=='free'){const s=await state(user);if(s.stage.type!==kind||s.stage.day!==day)return fail('Complete the current learning stage first.',409);if(!(kind==='daily'?dailyQuestions(day,await allQuestions()):stageQuestions(day,kind,await allQuestions(),await readContent(db()),examQuestions)).some(v=>v.id===id))return fail('This question is not assigned to the current stage.',409);}
-  const aid=crypto.randomUUID(),key=`${uid}/${aid}`;const data=await audio.arrayBuffer();const bytes=new Uint8Array(data);
-  const valid=(bytes[0]===0x1a&&bytes[1]===0x45&&bytes[2]===0xdf&&bytes[3]===0xa3)||(String.fromCharCode(...bytes.subarray(0,4))==='OggS')||(String.fromCharCode(...bytes.subarray(0,4))==='RIFF')||(String.fromCharCode(...bytes.subarray(4,8))==='ftyp');
-  if(!valid)return fail('The file does not contain a supported audio container.');
-  await E().BUCKET.put(key,data,{httpMetadata:{contentType:audio.type}});
-  try{await execute('INSERT INTO attempts (id,user_id,question_id,kind,day,duration,audio_key,mime,transcript,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',aid,uid,id,kind,day,duration,key,audio.type,transcript,now());}catch(e){await E().BUCKET.delete(key);throw e;}
-  return response({id:aid});
- }
- if(req.method==='POST'&&path==='evaluate'){
-  const config=await aiConfiguration(E(),db());if(!(config.OPENAI_API_KEY||config.GEMINI_API_KEY))return fail('AI feedback is not connected yet. Your recording is saved. You can retry after an API is connected.',503);
-  const {id}=z.object({id:z.string().uuid()}).parse(await req.json());const a=(await rows('SELECT * FROM attempts WHERE id=? AND user_id=?',id,uid))[0];if(!a)return fail('Answer not found.',404);
-  if(a.status==='evaluated')return response({feedback:parse(a.feedback)});
-  const date=now().slice(0,10);const limit=Math.max(1,Math.min(100,Number(E().DAILY_AI_LIMIT)||20));
-  const used=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,date,limit);if(!used.meta.changes)return fail('Daily AI limit reached. Your recording remains saved.',429);
-  await execute("UPDATE attempts SET status='failed' WHERE id=? AND user_id=? AND status='evaluating' AND (evaluating_at IS NULL OR evaluating_at<?)",id,uid,new Date(Date.now()-120000).toISOString());
-  const claim=await execute("UPDATE attempts SET status='evaluating',evaluating_at=? WHERE id=? AND user_id=? AND status IN ('recorded','failed')",now(),id,uid);if(!claim.meta.changes)return fail('This answer is already being evaluated.',409);
-  try{
-   const q=(await allQuestions()).find(q=>q.id===a.question_id);if(!q)throw new Error('QUESTION_UNAVAILABLE');const audio=await E().BUCKET.get(a.audio_key);if(!audio)throw new Error('AUDIO_UNAVAILABLE');
-   const feedback=await assess(config,q,a.transcript,await audio.arrayBuffer(),a.mime);
-   await execute("UPDATE attempts SET status='evaluated',feedback=? WHERE id=? AND user_id=?",JSON.stringify(feedback),id,uid);
-   return response({feedback});
-  }catch(e){await execute("UPDATE attempts SET status='failed' WHERE id=? AND user_id=?",id,uid);return fail(assessmentFailureMessage(e),502);}
- }
+ if(req.method==='POST'&&path==='record')return fail('Permanent recording storage is disabled. Submit your audio directly for temporary assessment.',410);
+ if(req.method==='POST'&&path==='evaluate')return fail('New feedback is temporary. Record or type this answer again to assess it in this tab.',410);
  if(req.method==='POST'&&path==='review-attempt'){
-  const {id}=z.object({id:z.string().uuid()}).parse(await req.json());const a=(await rows("SELECT * FROM attempts WHERE id=? AND user_id=? AND status='evaluated'",id,uid))[0];if(!a)return fail('Valid feedback is required before marking this answer reviewed.',409);
-  await execute('UPDATE attempts SET reviewed=1 WHERE id=? AND user_id=?',id,uid);return response({ok:true});
+  const body:any=await req.json();const receipt=await proof(body?.receipt,uid);if(!receipt)return fail('Assessment proof expired or is invalid. Assess this answer again.',409);
+  return response({ok:true,receipt:await issueReceipt({...receipt,reviewed:true},receiptSecret())});
  }
  if(req.method==='POST'&&path==='message'){const b=z.object({subject:z.string().min(3).max(160),body:z.string().min(10).max(5000)}).parse(await req.json());if(/[\u0980-\u09ff]/.test(b.subject+b.body))return fail('Please write your message in English.');const recent=await rows('SELECT id FROM messages WHERE user_id=? AND created_at>?',uid,new Date(Date.now()-3600000).toISOString());if(recent.length>=5)return fail('You can send up to five support messages per hour.',429);await execute("INSERT INTO messages (id,user_id,subject,body,reply,status,created_at) VALUES (?,?,?,?,'','open',?)",crypto.randomUUID(),uid,b.subject,b.body,now());return response({ok:true});}
  if(req.method==='POST'&&path==='practice-result'){
-  const b=z.object({attemptIds:z.array(z.string().uuid()).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20)}).parse(await req.json());if(new Set(b.questionIds).size!==b.questionIds.length||new Set(b.attemptIds).size!==b.attemptIds.length||b.questionIds.length!==b.attemptIds.length)return fail('Complete each distinct test question first.',409);
+  const b=z.object({receipts:z.array(z.string().max(4000)).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20)}).parse(await req.json());
+  const receipts=await Promise.all(b.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed))return fail('Record, assess and review every test answer first.',409);
+  const valid=receipts as PracticeReceipt[];if(new Set(b.questionIds).size!==b.questionIds.length||new Set(valid.map(r=>r.questionId)).size!==b.questionIds.length||valid.length!==b.questionIds.length||valid.some(r=>!b.questionIds.includes(r.questionId)))return fail('Each distinct test question needs its own reviewed answer.',409);
   const bank=await allQuestions();if(![1,2,3].every(p=>b.questionIds.some(id=>bank.find(q=>q.id===id)?.part===p)))return fail('A speaking test must include all three parts.',409);
-  const answers:any[]=[];for(const id of b.attemptIds){const a=(await rows("SELECT * FROM attempts WHERE id=? AND user_id=? AND status='evaluated' AND reviewed=1",id,uid))[0];if(!a||!a.mime.startsWith('audio/')||!b.questionIds.includes(a.question_id))return fail('Record, assess and review every test answer first.',409);answers.push(a);}
-  if(new Set(answers.map(a=>a.question_id)).size!==b.questionIds.length)return fail('Each test question needs its own answer.',409);
-  const bands=answers.map(a=>estimatedBand(parse(a.feedback))),ready=bands.every(v=>v!==null),content=await readContent(db());const band=ready?Math.round((bands as number[]).reduce((n,v)=>n+v,0)/bands.length*2)/2:null;const criteria=Object.fromEntries(['fluency','lexical','grammar','pronunciation'].map(k=>{const scores=answers.map(a=>parse(a.feedback)?.criteria?.[k]?.score);return [k,scores.every(v=>typeof v==='number')?Math.round(scores.reduce((n,v)=>n+v,0)/scores.length*2)/2:null];}));return response({band,criteria,passed:band!==null&&band>=content.passBand,threshold:content.passBand,answers:answers.length,label:'AI practice estimate',message:ready?(band!>=content.passBand?'Practice pass threshold met.':'Review your weaker criteria and try the test again.'):'Not enough clear audio evidence to estimate every criterion. Review the feedback and record another attempt.'});
+  return response(receiptResult(valid,(await readContent(db())).passBand));
  }
  if(req.method==='POST'&&path==='complete-stage'){
-  const s=await state(user),stage=s.stage;const activeBank=await allQuestions();if(stage.type==='complete')return fail('Track already complete.');const content=await readContent(db());const expected=stage.type==='daily'?dailyQuestions(stage.day,activeBank):stageQuestions(stage.day,stage.type,activeBank,content,examQuestions);
-  const answers=await rows("SELECT * FROM attempts WHERE user_id=? AND kind=? AND day=? AND status='evaluated' AND reviewed=1 ORDER BY created_at DESC",uid,stage.type,stage.day);
-  if(!expected.every(q=>answers.some(a=>a.question_id===q.id)))return fail('Record, evaluate and review every assigned answer before completing this stage.',409);
-  if(stage.type!=='daily'){const latest=expected.map(q=>answers.find(a=>a.question_id===q.id));const bands=latest.map(a=>estimatedBand(parse(a?.feedback)));if(bands.some(b=>b===null))return fail('Every test answer needs audio-based criterion estimates before a pass can be awarded.',409);const band=Math.round((bands as number[]).reduce((n,b)=>n+b,0)/bands.length*2)/2;if(band<content.passBand)return fail(`Practice band ${band.toFixed(1)}/9. The pass threshold is ${content.passBand.toFixed(1)}/9. Review your feedback and try again.`,409);}
+  const body=z.object({receipts:z.array(z.string().max(4000)).max(30)}).parse(await req.json());const s=await learningContext(uid),stage=s.stage;if(stage.type==='complete')return fail('Track already complete.');const activeBank=await allQuestions(),content=s.content;const expected=stage.type==='daily'?dailyQuestions(stage.day,activeBank):stageQuestions(stage.day,stage.type,activeBank,content,examQuestions);
+  const receipts=await Promise.all(body.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed||r.kind!==stage.type||r.day!==stage.day))return fail('Use reviewed audio assessments from your current learning stage.',409);
+  const valid=receipts as PracticeReceipt[];if(valid.length!==expected.length||new Set(valid.map(r=>r.questionId)).size!==expected.length||!expected.every(q=>valid.some(r=>r.questionId===q.id)))return fail('Record, assess and review every assigned answer before completing this stage.',409);
+  const result=receiptResult(valid,content.passBand);if(stage.type!=='daily'&&!result.passed)return fail(result.band===null?'Every test answer needs audio-based criterion estimates before a pass can be awarded.':`Practice band ${result.band.toFixed(1)}/9. The pass threshold is ${content.passBand.toFixed(1)}/9. Review your feedback and try again.`,409);
   if(stage.type==='daily')await execute('INSERT OR IGNORE INTO days (user_id,day,completed_at) VALUES (?,?,?)',uid,stage.day,now());
-  else await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',crypto.randomUUID(),uid,stage.day,stage.type,JSON.stringify(answers.map(a=>a.id)),now());
+  else await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM tests WHERE user_id=? AND milestone=? AND kind=?)',crypto.randomUUID(),uid,stage.day,stage.type,JSON.stringify({passed:true,practiceBand:result.band}),now(),uid,stage.day,stage.type);
   return response(await state(user));
  }
- if(req.method==='POST'&&path==='save'){
-  const data=z.object({type:z.enum(['bookmark','vocabulary','correction']),key:z.string().min(1).max(1000),data:z.unknown(),remove:z.boolean().optional(),reviewed:z.boolean().optional()}).parse(await req.json());
-  if(data.remove)await execute('DELETE FROM saved WHERE user_id=? AND type=? AND key=?',uid,data.type,data.key);
-  else await execute('INSERT INTO saved (user_id,type,key,data,reviewed) VALUES (?,?,?,?,?) ON CONFLICT(user_id,type,key) DO UPDATE SET data=excluded.data,reviewed=excluded.reviewed',uid,data.type,data.key,JSON.stringify(data.data).slice(0,20000),data.reviewed?1:0);
-  return response({ok:true});
- }
+ if(req.method==='POST'&&path==='save')return fail('New practice notes and feedback stay in this tab only. Use Download to keep a personal copy.',410);
  if(req.method==='POST'&&path==='profile'){
   const p=z.object({name:z.string().min(1).max(100),target:z.enum(['5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0']),track:z.union([z.literal(90),z.literal(120),z.literal(180),z.literal(210)]),examDate:z.string().max(10)}).parse(await req.json());
   await execute('UPDATE profiles SET name=?,target=?,track=?,exam_date=? WHERE user_id=?',p.name,p.target,p.track,p.examDate,uid);return response({ok:true});

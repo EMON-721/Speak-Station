@@ -47,7 +47,7 @@ After deploying, sign in with the configured owner's Google account. Open **Admi
 
 The new D1 database starts separately from the current Sites database. Existing learners, transcripts, feedback, custom questions and the encrypted API connection are not automatically copied. Static questions are included in the build. Reconnect Gemini on the new host rather than copying plaintext credentials. A migration of existing learner data would need a separate authenticated export/import.
 
-Recordings stay in browser memory for playback and are sent transiently to the assessment provider when submitted. The server saves transcripts, feedback and progress in D1. It hides permanent audio storage controls because this configuration has no R2. Download any recording you want to retain before leaving the practice session.
+Recordings stay in browser memory for playback and are sent transiently to the assessment provider when submitted. New transcripts and feedback stay in the current tab’s memory; D1 retains identity, completed days and passed test milestones. Assessment proofs are signed and short-lived, with no response text. Permanent audio storage is disabled. Download any recording you want to retain before leaving the practice session.
 
 Workers Free currently allows 100,000 requests per day and 10 ms CPU per request. D1 Free currently includes 5 million rows read per day, 100,000 rows written per day and 5 GB storage. Limits can change; check the official links above. Exceeding a free limit can interrupt service; this setup does not automatically upgrade a plan. The Vinext application must fit Workers Free CPU and bundle limits in your real account. Local build and dry-run checks do not replace that production check.
 

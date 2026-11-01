@@ -8,7 +8,7 @@ The library includes 3,852 original and template-based practice questions across
 
 Daily learning tracks bring together eight questions, weekly speaking tests and revision checkpoints. Audio-based feedback explains sentence corrections, answer gaps, contextual vocabulary, pronunciation evidence and targeted practice drills. Complete tests use a 6.5/9 practice pass threshold. AI estimates support learning and are distinct from official IELTS results.
 
-Automatic transcription shows recognised English speech during recording and completes the transcript after recording stops. Permanent audio saving is optional; transcripts and feedback remain available in progress.
+Automatic transcription shows recognised English speech during recording and completes the transcript after recording stops. New recordings, transcripts and detailed feedback stay in the current tab only. The server retains account identity, completed learning days and passed test milestones; short-lived signed assessment proofs enforce progression without an answer archive. Users can download their own reports.
 
 ## Owner workspace
 
@@ -18,7 +18,7 @@ Learner management includes suspension, restoration, account removal and documen
 
 ## Architecture
 
-A React interface on Vinext connects to a server API, Cloudflare D1 for structured account and content data, and private R2 storage for optional recordings. Sites supplies the deployment and sign-in boundary. Gemini provides transcription and audio feedback through an encrypted, owner-managed API connection. Authentication, administrative permissions, account status and learning gates are enforced on the server.
+A React interface on Vinext connects to a server API, Cloudflare D1 for structured account and content data, with short-lived signed assessment proofs. Legacy private recordings remain readable without creating new stored recordings. Sites supplies the deployment and sign-in boundary. Gemini provides transcription and audio feedback through an encrypted, owner-managed API connection. Authentication, administrative permissions, account status and learning gates are enforced on the server.
 
 See the [administrator guide](docs/ADMIN_GUIDE.md) for the editing workflow and the [implementation notes](docs/IMPLEMENTATION.md) for validation and deployment details.
 
