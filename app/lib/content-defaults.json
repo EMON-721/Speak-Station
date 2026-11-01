@@ -6,17 +6,17 @@
     "guestGreeting": "Your next chapter starts with a conversation."
   },
   "theme": {
-    "background": "#151519",
-    "panel": "#232125",
-    "text": "#f7efe7",
-    "muted": "#c9bdba",
-    "accent": "#dc9867",
+    "background": "#111214",
+    "panel": "#1D1F23",
+    "text": "#F2F3F5",
+    "muted": "#B5B8BF",
+    "accent": "#D8DADE",
     "fontSize": 16,
     "questionSize": 30,
     "headingFont": "Arial",
-    "border": "#4b3d42",
-    "heroStart": "#232125",
-    "heroEnd": "#201f25",
+    "border": "#35383E",
+    "heroStart": "#1D1F23",
+    "heroEnd": "#25282D",
     "bodyFont": "Arial"
   },
   "copy": {
@@ -595,8 +595,8 @@
     },
     {
       "id": "topics",
-      "label": "Question topics",
-      "target": "topics",
+      "label": "Complete Speaking Books",
+      "target": "books",
       "visible": true
     },
     {
@@ -1347,9 +1347,9 @@
     },
     {
       "id": "assessor",
-      "title": "Your speaking assessor",
-      "body": "Sentence corrections, answer gaps, contextual vocabulary and audio-based practice feedback.",
-      "button": "Manage AI connection",
+      "title": "AI speaking feedback",
+      "body": "One connected Gemini assessor powers practice, books and mock exams.",
+      "button": "View connection status",
       "action": "connection"
     },
     {

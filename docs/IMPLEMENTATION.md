@@ -47,3 +47,9 @@ Isolated API tests exercise the actual route handler with SQLite/object-store ad
 Added 20 distinct cross-part themes with 8 Part 1 prompts, 3 cue-card prompts, and 8 Part 3 discussions each (380 new prompts). Themes range from digital payments and public speaking to craft skills, consumer reviews, repair and community spaces. Together with the pre-existing library, the new pack gives the 240-book generator more varied subjects. As always, these are author-created IELTS-style prompts, not official IELTS exam questions.
 
 - Completed book and mock-exam summaries are saved in the existing per-user `tests` D1 table after verified **reviewed audio receipts** for all questions. Only book identifier, part criterion-based band estimates, overall server-verified practice band, mode, completion date and criterion summary are persisted; not raw audio, transcript or feedback. All other data-retention rules are unchanged.
+
+## Professional UI and existing Gemini credentials
+- Primary presentation is neutral graphite + silver (no brown, navy, blue or green branding). Legacy theme values stored in D1 are migrated at read time while leaving typography settings unchanged.
+- Removed the visible standalone-question catalog; all navigation now leads to complete three-part books. Original questions and existing learning state are retained. Former question links now open a matching book.
+- Added a Sample Mock placeholder using Book 001 (all three parts, no invented answer or score). Awaiting owner-provided example content.
+- AI configuration is one shared server-side source for Daily Practice, full books, Sample Mock, weekly and revision assessments. Stored D1 AES-GCM credentials are used when they decrypt; existing Cloudflare GEMINI_API_KEY Secrets are respected as a fallback. An older environment's key cannot be fabricated or retrieved from GitHub. Owner panel shows diagnostics and hides reconnect form when a connection already exists.
