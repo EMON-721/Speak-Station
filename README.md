@@ -87,6 +87,24 @@ The **Sample Mock** section introduces the type of questions and approximate str
 
 This is **preview-only**. It does not record audio, run assessment, award a score or count as an exam attempt.
 
+## Restored Progress Dashboard and achievements
+
+The personal **Progress Dashboard** combines the information learners need to see their improvement without storing full audio recordings:
+
+- Four overview statistics: speaking attempts, practice minutes, completed learning days and assessments.
+- **Last 7 Days** chart built from genuine completed days and exam records.
+- **Day-by-day activity timeline**, identifying completed daily practices, weekly/revision exams and speaking books.
+- **Achievement cards** for the first recording, first learning day, seven learning days and first completed assessment.
+- **Improvement areas** covering grammar patterns, vocabulary or word choice, fluency, pronunciation observations, missing ideas and spelling (written evidence only).
+- The full **Part 1, Part 2, Part 3 and Overall** band history.
+- Personal profile information including account ID, name, email, optional phone and target band.
+
+Numerical mistake-category counts and practice duration are collected only from newly completed assessments; missing earlier counts are marked as unavailable rather than invented. Detailed question-by-question grammar, sentence, vocabulary and pronunciation evidence remains available **during the active speaking session** via **Mistake map**, **Grammar & structure**, **Vocabulary**, **Pronunciation & fluency** and the other assessment tabs.
+
+The **Quick Speaking Guidelines** appear near the bottom of the main page as short expandable reminders, rather than a lengthy tutorial section.
+
+**Feature preservation:** Core learner-facing dashboards, profile controls, achievements and feedback sections must not be removed merely to simplify page design. Removing them requires explicit owner approval. A structural regression test protects these sections.
+
 ## Profile, scores and privacy
 
 Speak Station keeps the learner's useful long-term record small:

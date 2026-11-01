@@ -32,5 +32,7 @@ jobs:
         run: pnpm exec tsc --noEmit
       - name: Speaking-book and part-level assessment tests
         run: node scripts/tests/verify-speaking-parts.mjs
+      - name: Preserve core learner-facing features
+        run: node scripts/tests/verify-features.mjs
       - name: Cloudflare production build (no secrets)
         run: pnpm run build:cloudflare
