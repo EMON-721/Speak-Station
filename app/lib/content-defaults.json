@@ -6,17 +6,17 @@
     "guestGreeting": "Your next chapter starts with a conversation."
   },
   "theme": {
-    "background": "#0b1220",
-    "panel": "#121d30",
-    "text": "#eaf0f8",
-    "muted": "#aab8ce",
-    "accent": "#3265c7",
+    "background": "#14171c",
+    "panel": "#1e232b",
+    "text": "#f4f6fa",
+    "muted": "#b8c1cf",
+    "accent": "#376fc9",
     "fontSize": 16,
     "questionSize": 30,
     "headingFont": "Arial",
-    "border": "#2a3b55",
-    "heroStart": "#15243d",
-    "heroEnd": "#1a2d4a",
+    "border": "#343c47",
+    "heroStart": "#1e232b",
+    "heroEnd": "#1e232b",
     "bodyFont": "Arial"
   },
   "copy": {

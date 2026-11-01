@@ -144,12 +144,12 @@ html[data-theme=dark] body{background:#101315;color:#f0ede7}
 .assessment-entry>span{flex-basis:100%;font-size:14px;color:var(--muted);line-height:1.7}
 .assessment-error{margin:22px 0;padding:22px;border:1px solid var(--green);border-left-width:4px;border-radius:12px;background:var(--bg);color:var(--text)}
 
-/* One formal navy/blue palette. Semantic tokens also keep light mode readable. */
-:root{--bg:#f4f7fc;--panel:#fff;--ink:#14233b;--text:#14233b;--muted:#4e6078;--border:#cfdae8;--green:#2456af;--green-deep:#244f9b;--green-soft:#e8effb;--peach:#e8effb;--lavender:#e8effb;--gold:#e8effb;--hero:#edf3ff}
-html[data-theme=dark]{--bg:#0b1220;--panel:#121d30;--ink:#eaf0f8;--text:#eaf0f8;--muted:#aab8ce;--border:#2a3b55;--green:#a7c7ff;--green-deep:#a7c7ff;--green-soft:#1b2c48;--peach:#1b2c48;--lavender:#1b2c48;--gold:#1b2c48;--hero:#15243d}
+/* One formal graphite/blue palette. Semantic tokens also keep light mode readable. */
+:root{--bg:#f5f6f8;--panel:#fff;--ink:#20252d;--text:#20252d;--muted:#566273;--border:#d8dee7;--green:#315fa7;--green-deep:#315fa7;--green-soft:#e9eef7;--peach:#e9eef7;--lavender:#e9eef7;--gold:#e9eef7;--hero:#eef1f6}
+html[data-theme=dark]{--bg:#14171c;--panel:#1e232b;--ink:#f4f6fa;--text:#f4f6fa;--muted:#b8c1cf;--border:#343c47;--green:#9dbdf9;--green-deep:#9dbdf9;--green-soft:#282f3a;--peach:#282f3a;--lavender:#282f3a;--gold:#282f3a;--hero:#1e232b}
 html body,html[data-theme=dark] body{background:var(--bg);color:var(--text)}
-.homepage-shell{--primary:#3265c7;--accent-ink:#2456af;--surface:#e8effb;--surface-hover:#dde8fa;--art-start:#d4e3fc;--art-end:#adc9f2;--art-ink:#234d91;--green:var(--accent-ink);--green-deep:var(--accent-ink);--green-soft:var(--surface);--peach:var(--surface);--lavender:var(--surface);--gold:var(--surface);--sage:var(--surface);--hero:var(--hero-start);background:var(--bg);color:var(--text);color-scheme:light}
-html[data-theme=dark] .homepage-shell{--accent-ink:#a7c7ff;--surface:#1b2c48;--surface-hover:#243a5c;--art-start:#345995;--art-end:#1c365e;--art-ink:#dbe8ff;color-scheme:dark}
+.homepage-shell{--primary:#376fc9;--accent-ink:#315fa7;--surface:#e9eef7;--surface-hover:#dfe7f3;--art-start:#d4e3fc;--art-end:#adc9f2;--art-ink:#234d91;--green:var(--accent-ink);--green-deep:var(--accent-ink);--green-soft:var(--surface);--peach:var(--surface);--lavender:var(--surface);--gold:var(--surface);--sage:var(--surface);--hero:var(--hero-start);background:var(--bg);color:var(--text);color-scheme:light}
+html[data-theme=dark] .homepage-shell{--accent-ink:#9dbdf9;--surface:#282f3a;--surface-hover:#343e4d;--art-start:#333d4c;--art-end:#252c37;--art-ink:#e0e7f2;color-scheme:dark}
 .homepage-shell ::selection{background:var(--surface-hover);color:var(--text)}
 .homepage-shell :is(button,a,input,textarea,select,summary):focus-visible{outline:3px solid var(--accent-ink);outline-offset:4px}
 .homepage-shell :is(h1,h2,h3,h4,h5,.brand,.home-topbar .brand,.question-text,.library-question h3,.exam-set h3,.lesson-card h3,.panel h3,.band-panel h3,.modal h2,.transcript-card h3,.correction-card summary strong,.report-summary h3,.criterion-grid strong,.profile-heading h3,.lesson-detail h2,.exam-hero h2,.plan-row h3,.tip-card h3){color:var(--text)}
@@ -169,7 +169,7 @@ html[data-theme=dark] .homepage-shell{--accent-ink:#a7c7ff;--surface:#1b2c48;--s
 .homepage-shell :is(.icon-btn,.library-part>svg,.plan-row>svg,.before-after>svg,.correction-card summary>svg,.vocab-swap>svg){color:var(--muted)}
 .homepage-shell :is(.avatar,.pill,.pill.peach,.pill.purple,.pill.blue,.pill.neutral,.home-header-label .pill,.stat-icon,.peach,.sage,.lavender,.gold,.part-symbol.warm,.part-symbol.violet,.part-symbol.blue,.lesson-icon,.lesson-icon.peach,.lesson-icon.lavender,.modal-symbol,.modal-symbol.peach,.empty-icon,.connection-steps b,.question-bottom button,.row-topic,.vocab-levels b,.priorities>div span){background:var(--surface);color:var(--accent-ink);border-color:var(--border)}
 .homepage-shell .avatar{box-shadow:0 0 0 1px var(--border)}
-.homepage-shell .hero{background:linear-gradient(120deg,var(--hero-start),var(--hero-end));border:1px solid var(--border);box-shadow:none}
+.homepage-shell .hero{background:var(--hero-start);border:1px solid var(--border);box-shadow:none}
 .homepage-shell .hero h2{color:var(--text)}
 .homepage-shell .hero h2 em{color:var(--accent-ink);font-family:inherit;font-style:normal;font-weight:500}
 .homepage-shell :is(.hero p,.hero-copy>p,.hero-meta,.hero-meta span){color:var(--muted)}

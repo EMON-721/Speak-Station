@@ -14,7 +14,7 @@ export const contentSchema=z.object({
 export type SiteContent=z.infer<typeof contentSchema>;
 export async function readContent(db:D1Database){const r=await db.prepare("SELECT value FROM settings WHERE key='site_content'").bind().all();const row:any=r.results?.[0];if(!row)return defaultContent as SiteContent;try{const content=contentSchema.parse({...defaultContent,...JSON.parse(row.value)});
 // Upgrade the built-in legacy palettes without replacing an owner's custom theme or type sizes.
-if(['#e9b477','#8298ef','#609a7a'].includes(content.theme.accent.toLowerCase())&&['#101315','#182036','#19231f'].includes(content.theme.background.toLowerCase()))content.theme={...content.theme,...(defaultContent as SiteContent).theme,fontSize:content.theme.fontSize,questionSize:content.theme.questionSize};
+if(['#e9b477','#8298ef','#609a7a','#3265c7'].includes(content.theme.accent.toLowerCase())&&['#101315','#182036','#19231f','#0b1220'].includes(content.theme.background.toLowerCase()))content.theme={...content.theme,...(defaultContent as SiteContent).theme,fontSize:content.theme.fontSize,questionSize:content.theme.questionSize};
 return content;}catch{return defaultContent as SiteContent;}}
 export function estimatedBand(feedback:any){const values=['fluency','lexical','grammar','pronunciation'].map(k=>feedback?.criteria?.[k]?.score);return values.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=9)?Math.round(values.reduce((a,b)=>a+b,0)/4*2)/2:null;}
 export function stageQuestions(day:number,kind:string,bank:any[],content:SiteContent,fallback:(day:number,bank:any[])=>any[]){const exam=content.exams.find(e=>e.kind===kind&&e.day===day);return exam?.questionIds.length?exam.questionIds.map(id=>bank.find(q=>q.id===id)).filter(Boolean):fallback(day,bank);}
