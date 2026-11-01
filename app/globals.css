@@ -443,3 +443,52 @@ body{background:#111214;color:#F2F3F5}
 .ai-connection-healthy p,.ai-connection-missing p{font-size:13px;line-height:1.6;color:#C5C9D0!important;margin:7px 0}
 .ai-connection-missing code{color:#EDEEF1;font-size:12px}
 @media(max-width:640px){.homepage-shell .sample-mock-card{align-items:stretch;flex-direction:column}}
+
+
+/* November: keep the book explorer separate from the hero action and art. */
+.homepage-shell .hero{position:relative;overflow:hidden;isolation:isolate;background:linear-gradient(120deg,#1d1f23,#25282d)!important;border:1px solid #383c43!important}
+.homepage-shell .hero-copy{position:relative;z-index:2;display:flex;align-items:flex-start;flex-direction:column;gap:0;max-width:min(100%,710px);min-width:0}
+.homepage-shell .hero-copy>.button{position:relative;display:inline-flex;max-width:100%;white-space:normal;text-align:center;line-height:1.4}
+.homepage-shell .hero-copy>.hero-books-link{display:inline-flex!important;position:relative!important;width:fit-content;max-width:100%;clear:both;align-items:center;justify-content:flex-start;gap:9px;padding:10px 0;margin:13px 0 5px;line-height:1.45;white-space:normal;overflow-wrap:anywhere;z-index:4;color:#e0e3e8!important}
+.homepage-shell .hero-copy>.hero-books-link svg{flex-shrink:0}
+.homepage-shell .hero-copy>.hero-meta{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:12px;clear:both;width:100%;max-width:100%;margin-top:6px}
+.homepage-shell .hero-art{pointer-events:none}
+.homepage-shell .home-jumps{display:flex;flex-wrap:wrap;gap:12px;max-width:100%}
+.homepage-shell .home-jumps button{display:flex;align-items:center;justify-content:space-between;min-width:0;max-width:100%;white-space:normal;text-align:left;gap:8px}
+.homepage-shell .book-part-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.homepage-shell .book-part-tabs button{min-width:0;overflow-wrap:anywhere}
+.homepage-shell .book-question-list>div{min-width:0;overflow-wrap:anywhere}
+.homepage-shell .book-comments details summary{align-items:flex-start;flex-wrap:wrap}
+.homepage-shell .book-comments details summary span{min-width:0;overflow-wrap:anywhere;flex:1 1 210px}
+.homepage-shell .part-group-result{margin-top:16px;padding:17px;border:1px solid #51555d;border-radius:12px;background:#292c31}
+.homepage-shell .part-group-score{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.homepage-shell .part-group-score span{font-size:25px;font-weight:750;color:#f1f2f4}
+.homepage-shell .part-group-result p{margin:10px 0;font-size:13px;line-height:1.7}
+.homepage-shell .part-group-result small,.homepage-shell .part-pending-note{color:#bec2ca;font-size:12px}
+.homepage-shell .part-pending-note{margin-top:12px;line-height:1.6}
+.homepage-shell .part-ready-message{display:flex;align-items:center;gap:8px;font-size:13px;color:#e2e4e8}
+.homepage-shell .part-navigation-help{font-size:12px;flex:1;color:#bfc3ca;line-height:1.6;text-align:center}
+.homepage-shell .question-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.homepage-shell .book-final-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.homepage-shell .book-final-parts>div{min-width:0}
+.homepage-shell .book-final-parts strong{overflow-wrap:anywhere}
+@media(max-width:920px){
+ .homepage-shell .hero-copy{max-width:70%}
+ .homepage-shell .hero-art{opacity:.35}
+}
+@media(max-width:650px){
+ .homepage-shell .hero{overflow:hidden;min-height:0;padding:24px 20px}
+ .homepage-shell .hero-copy{max-width:100%;width:100%}
+ .homepage-shell .hero-copy>.button{font-size:12px}
+ .homepage-shell .hero-art{display:none}
+ .homepage-shell .hero-copy>.hero-books-link{font-size:12px;margin-top:12px}
+ .homepage-shell .hero-copy>.hero-meta{font-size:11px}
+ .homepage-shell .home-jumps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .homepage-shell .home-jumps button{width:100%;font-size:12px;padding:11px}
+ .homepage-shell .question-navigation .button{min-width:0}
+ .homepage-shell .part-navigation-help{order:4;flex-basis:100%}
+}
+@media(max-width:390px){
+ .homepage-shell .home-jumps{grid-template-columns:1fr}
+ .homepage-shell .book-part-tabs button{padding:7px;font-size:11px}
+}
