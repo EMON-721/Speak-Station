@@ -1,4 +1,5 @@
 import {issueReceipt,readReceipt,receiptResult,type PracticeReceipt} from '../../lib/practice-receipts';
+import {summarizeSpeakingParts} from '../../lib/part-scores';
 import {buildSpeakingBooks} from '../../lib/speaking-books';
 import {readContent,contentSchema,estimatedBand,stageQuestions} from '../../lib/content';
 import {env} from 'cloudflare:workers';
@@ -56,7 +57,7 @@ async function handler(req:Request){
  const admin=!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase();
  if(req.method!=='GET'){
   const origin=req.headers.get('origin');if(!origin||new URL(origin).origin!==new URL(req.url).origin)return fail('This action must start from Speak Station.',403);
-  const length=Number(req.headers.get('content-length')||0);if(length>9*1024*1024)return fail('Audio files must be smaller than 8 MB.',413);
+  const length=Number(req.headers.get('content-length')||0);if(length>(path==='assess-part'?17:9)*1024*1024)return fail(path==='assess-part'?'Combined part audio must be smaller than 17 MB.':'Audio files must be smaller than 8 MB.',413);
  }
  if(req.method==='GET'&&path.startsWith('audio/')){
   const id=path.slice(6);const a=admin?(await rows('SELECT * FROM attempts WHERE id=?',id))[0]:(await rows('SELECT * FROM attempts WHERE id=? AND user_id=?',id,uid))[0];if(!a)return fail('Recording not found.',404);
@@ -174,18 +175,12 @@ async function handler(req:Request){
   const receipts=await Promise.all(b.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed))return fail('Record, assess and review every test answer first.',409);
   const valid=receipts as PracticeReceipt[];if(new Set(b.questionIds).size!==b.questionIds.length||new Set(valid.map(r=>r.questionId)).size!==b.questionIds.length||valid.length!==b.questionIds.length||valid.some(r=>!b.questionIds.includes(r.questionId)))return fail('Each distinct test question needs its own reviewed answer.',409);
   const bank=await allQuestions();if(![1,2,3].every(p=>b.questionIds.some(id=>bank.find(q=>q.id===id)?.part===p)))return fail('A speaking test must include all three parts.',409);
-  const result=receiptResult(valid,(await readContent(db())).passBand);
+  const threshold=(await readContent(db())).passBand;
+  const result=summarizeSpeakingParts(valid,bank.filter(q=>b.questionIds.includes(q.id)),threshold);
   if(!b.bookNumber)return response(result);
   const book=buildSpeakingBooks(bank,240)[b.bookNumber-1];
   if(!book||book.questions.length!==b.questionIds.length||book.questions.some((q,i)=>q.id!==b.questionIds[i]))return fail('This speaking book has changed. Restart with the current question collection.',409);
-  const partScores:Record<number,number|null>={};
-  for(const part of [1,2,3]){
-   const ids=book.questions.filter(q=>q.part===part).map(q=>q.id);
-   const partReceipts=valid.filter(r=>ids.includes(r.questionId));
-   const numbers=partReceipts.flatMap(r=>r.scores);
-   partScores[part]=partReceipts.length!==ids.length||numbers.some(v=>typeof v!=='number'||!Number.isFinite(v))
-    ?null:Math.max(0,Math.min(9,Math.round((numbers as number[]).reduce((a,c)=>a+c,0)/numbers.length*2)/2));
-  }
+  const partScores=result.partScores;
   const mode=b.bookMode||'practice';
   await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',
    crypto.randomUUID(),uid,b.bookNumber,mode==='exam'?'book-exam':'book',
@@ -196,10 +191,10 @@ async function handler(req:Request){
   const body=z.object({receipts:z.array(z.string().max(4000)).max(30)}).parse(await req.json());const s=await learningContext(uid),stage=s.stage;if(stage.type==='complete')return fail('Track already complete.');const activeBank=await allQuestions(),content=s.content;const expected=stage.type==='daily'?dailyQuestions(stage.day,activeBank):stageQuestions(stage.day,stage.type,activeBank,content,examQuestions);
   const receipts=await Promise.all(body.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed||r.kind!==stage.type||r.day!==stage.day))return fail('Use reviewed audio assessments from your current learning stage.',409);
   const valid=receipts as PracticeReceipt[];if(valid.length!==expected.length||new Set(valid.map(r=>r.questionId)).size!==expected.length||!expected.every(q=>valid.some(r=>r.questionId===q.id)))return fail('Record, assess and review every assigned answer before completing this stage.',409);
-  const result=receiptResult(valid,content.passBand);if(stage.type!=='daily'&&!result.passed)return fail(result.band===null?'Every test answer needs audio-based criterion estimates before a pass can be awarded.':`Practice band ${result.band.toFixed(1)}/9. The pass threshold is ${content.passBand.toFixed(1)}/9. Review your feedback and try again.`,409);
+  const result=summarizeSpeakingParts(valid,expected,content.passBand);if(stage.type!=='daily'&&!result.passed)return fail(result.band===null?'Every test answer needs audio-based criterion estimates before a pass can be awarded.':`Practice band ${result.band.toFixed(1)}/9. The pass threshold is ${content.passBand.toFixed(1)}/9. Review your feedback and try again.`,409);
   if(stage.type==='daily')await execute('INSERT OR IGNORE INTO days (user_id,day,completed_at) VALUES (?,?,?)',uid,stage.day,now());
-  else await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM tests WHERE user_id=? AND milestone=? AND kind=?)',crypto.randomUUID(),uid,stage.day,stage.type,JSON.stringify({passed:true,practiceBand:result.band}),now(),uid,stage.day,stage.type);
-  return response(await state(user));
+  else await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM tests WHERE user_id=? AND milestone=? AND kind=?)',crypto.randomUUID(),uid,stage.day,stage.type,JSON.stringify({passed:true,practiceBand:result.band,partScores:result.partScores}),now(),uid,stage.day,stage.type);
+  return response({...await state(user),stageResult:result});
  }
  if(req.method==='POST'&&path==='save')return fail('New practice notes and feedback stay in this tab only. Use Download to keep a personal copy.',410);
  if(req.method==='POST'&&path==='profile'){
