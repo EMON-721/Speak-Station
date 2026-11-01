@@ -3,7 +3,7 @@ import {webcrypto} from 'node:crypto';
 import {loadTs} from './ts-loader.mjs';
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 const {standaloneIdentity,signAuth,verifyAuth}=loadTs('worker/google-auth.ts');
-const env={AUTH_MODE:'google',AUTH_SECRET:'0123456789abcdef0123456789abcdef',GOOGLE_CLIENT_ID:'fake-client',GOOGLE_CLIENT_SECRET:'fake-secret',APP_ORIGIN:'https://speak.test'};
+const env={AUTH_MODE:'google',AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID(),GOOGLE_CLIENT_ID:'fake-client',GOOGLE_CLIENT_SECRET:'fake-secret',APP_ORIGIN:'https://speak.test'};
 const noSession=await standaloneIdentity(new Request('https://speak.test/',{headers:{'oai-authenticated-user-id':'injected','oai-authenticated-user-email':'evil@example.com'}}),env);
 assert(noSession instanceof Request);
 assert.equal(noSession.headers.has('oai-authenticated-user-id'),false,'forged identity headers are stripped');
@@ -77,3 +77,11 @@ try{
 }finally{globalThis.fetch=googleFetch}
 
 console.log('PASS: OAuth PKCE, state, safe redirect, signed session, forgery rejection and signout');
+
+for(const mode of [undefined,'','chatgpt','disabled']){
+ const denied=await standaloneIdentity(new Request('https://speak.test/api/state',{headers:{'oai-authenticated-user-id':'forged','oai-authenticated-user-email':'owner@example.com'}}),{...env,AUTH_MODE:mode},true);
+ assert.equal(denied.status,503,'standalone identity fails closed on auth misconfiguration');
+}
+const forged=await standaloneIdentity(new Request('https://speak.test/api/state',{headers:{cookie:'__Host-speak-session='+signed+'x'}}),env,true);
+assert.equal(forged.headers.has('oai-authenticated-user-id'),false,'tampered session cannot inject identity');
+console.log('PASS: standalone auth cannot be disabled by missing or changed AUTH_MODE');

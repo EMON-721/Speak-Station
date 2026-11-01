@@ -1,11 +1,14 @@
+import {secureResponse} from '../app/lib/request-security';
 import { standaloneIdentity } from './google-auth';
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 
+declare const __SPEAK_STANDALONE__: boolean;
+
 const worker = {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
-    const identity=await standaloneIdentity(request,env);if(identity instanceof Response)return identity;request=identity;
+    const identity=await standaloneIdentity(request,env,__SPEAK_STANDALONE__);if(identity instanceof Response)return secureResponse(identity);request=identity;
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
     // the auxiliary service binding are absent from production builds.
@@ -25,7 +28,7 @@ const worker = {
         },
       };
     }
-    return runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+    return secureResponse(await runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx)));
   },
 };
 

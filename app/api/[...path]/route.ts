@@ -1,3 +1,4 @@
+import {protectMutation,RequestBoundaryError,PRIVATE_HEADERS} from '../../lib/request-security';
 import {issueReceipt,readReceipt,receiptResult,type PracticeReceipt} from '../../lib/practice-receipts';
 import {summarizeSpeakingParts} from '../../lib/part-scores';
 import {buildSpeakingBooks} from '../../lib/speaking-books';
@@ -19,7 +20,7 @@ export const dynamic='force-dynamic';
 const E=()=>env as any;
 const receiptSecret=()=>String(E().PRACTICE_RECEIPT_SECRET||E().CREDENTIAL_ENCRYPTION_KEY||'');
 const proof=(value:unknown,userId:string)=>readReceipt(value,receiptSecret(),userId);
-const response=(v:any,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+const response=(v:any,status=200)=>Response.json(v,{status,headers:PRIVATE_HEADERS});
 const fail=(msg:string,status=400)=>response({error:msg},status);
 const now=()=>new Date().toISOString();
 function db(){if(!E().DB)throw new Error('STORAGE_UNAVAILABLE');return E().DB as D1Database;}
@@ -85,15 +86,16 @@ async function requireStudySession(uid:string,id:string,kind:string,day:number,m
 }
 async function learningContext(uid:string){const [profiles,days,tests,content]=await Promise.all([rows('SELECT track FROM profiles WHERE user_id=?',uid),rows('SELECT day FROM days WHERE user_id=?',uid),rows('SELECT kind,milestone,answers FROM tests WHERE user_id=?',uid),readContent(db())]);return {content,stage:nextStage(days.map(d=>d.day),tests,profiles[0]?.track||210,content.exams)};}
 async function state(user:any){
- const authProvider=E().AUTH_MODE==='google'?'Google':'ChatGPT';const connection=await connectionStatus(E(),db());const content=await readContent(db());const revisionRow=await rows("SELECT value FROM settings WHERE key='site_content_revision'");const contentRevision=Number(revisionRow[0]?.value||0);
- if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],activityDays:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,connection,storageReady:!!E().DB,audioStorageReady:false,learningStorage:'progress-only',scheduling:{practice:eligibility('practice',[],[]),test:eligibility('test',[],[])},isAdmin:false};
+ const admin=isVerifiedGoogleOwner(user,E());const authProvider=E().AUTH_MODE==='google'?'Google':'ChatGPT';const connection=await connectionStatus(E(),db());const content=await readContent(db());const revisionRow=await rows("SELECT value FROM settings WHERE key='site_content_revision'");const contentRevision=Number(revisionRow[0]?.value||0);
+ if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],activityDays:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,...(admin?{connection}:{}),storageReady:!!E().DB,audioStorageReady:false,learningStorage:'progress-only',scheduling:{practice:eligibility('practice',[],[]),test:eligibility('test',[],[])},isAdmin:false};
  await execute('INSERT OR IGNORE INTO profiles (user_id,name,track,created_at) VALUES (?,?,?,?)',user.userId,user.displayName,210,now());
  const [profiles,attempts,saved,days,tests,cooldowns]=await Promise.all([rows('SELECT * FROM profiles WHERE user_id=?',user.userId),rows('SELECT * FROM attempts WHERE user_id=? AND created_at>=? ORDER BY created_at DESC LIMIT 100',user.userId,new Date(Date.now()-86400000).toISOString()),rows('SELECT * FROM saved WHERE user_id=?',user.userId),rows('SELECT * FROM days WHERE user_id=? ORDER BY day',user.userId),rows('SELECT * FROM tests WHERE user_id=?',user.userId),activeCooldowns(user.userId)]);
  const complete=days.map(d=>d.day);
- return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email,memberNumber:(await rows('SELECT member_number FROM member_numbers WHERE user_id=?',user.userId))[0]?.member_number??null},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,activityDays:days.map(d=>({day:d.day,completedAt:d.completed_at})),tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,scheduling:await studyQuota(user.userId),weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:isVerifiedGoogleOwner(user,E())};
+ return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email,memberNumber:(await rows('SELECT member_number FROM member_numbers WHERE user_id=?',user.userId))[0]?.member_number??null},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,activityDays:days.map(d=>({day:d.day,completedAt:d.completed_at})),tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,scheduling:await studyQuota(user.userId),weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,...(admin?{connection}:{}),storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:isVerifiedGoogleOwner(user,E())};
 }
 async function handler(req:Request){
  const path=new URL(req.url).pathname.replace(/^\/api\//,'');const user=await getChatGPTUser();
+ if(req.method!=='GET')req=await protectMutation(req);
  if(user){const control=(await rows('SELECT status FROM user_access WHERE user_id=?',user.userId))[0];if(control&&control.status!=='active')return fail(control.status==='deleted'?'This account has been removed by the administrator.':'Your account is suspended. Contact the site owner.',403);await execute("INSERT INTO user_access (user_id,email,status,reason,updated_at) VALUES (?,?,'active','',?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email",user.userId,user.email,now());await execute('INSERT OR IGNORE INTO member_numbers(user_id) SELECT ? WHERE NOT EXISTS(SELECT 1 FROM member_numbers WHERE user_id=?)',user.userId,user.userId);}
  if(req.method==='GET'&&path==='state'){if(user)await cleanupOldAudio();return response(await state(user))}
  if(!user&&E().AUTH_MODE==='google')return fail('Sign in with Google to access Speak Station.',401);
@@ -170,7 +172,7 @@ async function handler(req:Request){
   if(!admin)return fail('Only the site owner can connect an AI provider.',403);
   if(!E().CREDENTIAL_ENCRYPTION_KEY)return fail('Secure credential storage is not configured.',503);
   const body=z.object({key:z.string().min(20).max(300)}).parse(await req.json());
-  try{const model=await verifyGemini(body.key);const encrypted=await encryptCredential(body.key,E().CREDENTIAL_ENCRYPTION_KEY);const checkedAt=now();await execute("INSERT INTO settings (key,value) VALUES ('gemini_connection',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify({encrypted,model,checkedAt}));await execute('INSERT INTO audit VALUES (?,?,?,?,?)',crypto.randomUUID(),uid,'integration.connected','Gemini connection verified; key stored encrypted',now());return response({ok:true,model,checkedAt});}catch(e){return fail(e instanceof Error?e.message:'Connection could not be verified.',400);}
+  try{const model=await verifyGemini(body.key);const encrypted=await encryptCredential(body.key,E().CREDENTIAL_ENCRYPTION_KEY);const checkedAt=now();await execute("INSERT INTO settings (key,value) VALUES ('gemini_connection',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify({encrypted,model,checkedAt}));await execute('INSERT INTO audit VALUES (?,?,?,?,?)',crypto.randomUUID(),uid,'integration.connected','Gemini connection verified; key stored encrypted',now());return response({ok:true,model,checkedAt});}catch(e){return fail(assessmentFailureMessage(e),400);}
  }
  if(path==='integration/test'&&req.method==='POST'){
   if(!admin)return fail('Only the site owner can run a connection test.',403);
@@ -431,5 +433,5 @@ async function handler(req:Request){
  }
  return fail('Route not found.',404);
 }
-export async function GET(req:Request){try{return await handler(req)}catch(e){console.error('Speak Station GET failed',e instanceof Error?e.name:'Unknown');return fail('Your workspace could not load. Please try again.',503);}}
-export async function POST(req:Request){try{return await handler(req)}catch(e){if(e instanceof z.ZodError)return fail('Please check the submitted information.');console.error('Speak Station POST failed',e instanceof Error?e.name:'Unknown');return fail('This action could not finish. Please try again.',503);}}
+export async function GET(req:Request){try{return await handler(req)}catch(e){console.error('Speak Station GET failed');return fail('Your workspace could not load. Please try again.',503);}}
+export async function POST(req:Request){try{return await handler(req)}catch(e){if(e instanceof RequestBoundaryError)return fail(e.message,e.status);if(e instanceof z.ZodError||e instanceof SyntaxError)return fail('Please check the submitted information.');console.error('Speak Station POST failed');return fail('This action could not finish. Please try again.',503);}}

@@ -32,12 +32,12 @@ export async function connectionStatus(env:any,db:D1Database){
  return {configured:false,provider:null,model:null,checkedAt:null,source:'missing',reason:saved?.unavailable||'This Cloudflare environment has no saved Gemini connection or GEMINI_API_KEY Secret. A prior separate deployment does not automatically transfer its encrypted key.'};
 }
 export async function verifyGemini(key:string){
- const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models',{headers:{'x-goog-api-key':key},signal:AbortSignal.timeout(20000)});if(!res.ok)throw await providerFailure(res,'Gemini');const v:any=await res.json();
+ const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models',{redirect:'error',headers:{'x-goog-api-key':key},signal:AbortSignal.timeout(20000)});if(!res.ok)throw await providerFailure(res,'Gemini');const v:any=await res.json();
  const candidates=(v.models||[]).filter((m:any)=>(m.supportedGenerationMethods||[]).includes('generateContent')&&/flash/.test(m.name)&&!/(image|tts|live|embed|thinking|cyber|robot|computer|agent)/.test(m.name));
  const version=(name:string)=>Number(name.match(/gemini-(\d+(?:\.\d+)?)/)?.[1]||0);const rank=(name:string)=>(!/(preview|experimental)/.test(name)?10000:0)+version(name)*100+(/flash-lite/.test(name)?1000:0);
  candidates.sort((a:any,b:any)=>rank(b.name)-rank(a.name));if(!candidates.length)throw new Error('No compatible Gemini Flash model is available for this key.');
  for(const model of candidates.slice(0,4)){
-  const id=model.name.replace('models/','');const probe=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(id)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:'Connection check. Return JSON {"connected":true}.'}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:128}}),signal:AbortSignal.timeout(30000)});
+  const id=model.name.replace('models/','');const probe=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(id)}:generateContent`,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:'Connection check. Return JSON {"connected":true}.'}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:128}}),signal:AbortSignal.timeout(30000)});
   if(probe.ok)return id;if(probe.status===404||probe.status===503)continue;throw await providerFailure(probe,'Gemini');
  }
  throw new Error('Google listed these Flash models but rejected their generation endpoints. Check current model availability in Google AI Studio.');

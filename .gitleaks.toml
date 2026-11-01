@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+# The history scan identified exactly this historical synthetic OAuth fixture.
+# Match the test path AND the exact fake value; no real key pattern is exempt.
+[[allowlists]]
+description = "Historical synthetic OAuth signing fixture (replaced with random test bytes)"
+condition = "AND"
+paths = ['''^scripts/tests/verify-google-oauth\.mjs$''']
+regexTarget = "secret"
+regexes = ['''^0123456789abcdef0123456789abcdef$''']

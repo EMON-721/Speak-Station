@@ -19,7 +19,7 @@ export async function assess(env:any,q:Question,transcript:string,audio:ArrayBuf
   let binary='';if(audio){const bytes=new Uint8Array(audio);for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));}
   const endpoint=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.AI_MODEL||'gemini-3.8-flash')}:generateContent`;
   const payload:any={systemInstruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:prompt+(audio?'':'\nTranscript-only practice. No audio evidence: do not assess pronunciation or acoustic fluency.')},...(audio?[{inlineData:{mimeType:mime.split(';')[0],data:btoa(binary)}}]:[])]}],generationConfig:{responseMimeType:'application/json',temperature:0.2,maxOutputTokens:10000}};
-  const send=()=>fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify(payload),signal:AbortSignal.timeout(90000)});
+  const send=()=>fetch(endpoint,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify(payload),signal:AbortSignal.timeout(90000)});
   let res=await send();
 
 
@@ -28,9 +28,9 @@ export async function assess(env:any,q:Question,transcript:string,audio:ArrayBuf
   if(!env.OPENAI_API_KEY)throw new Error('AI_NOT_CONFIGURED');
   let text=transcript;
   if(audio){const f=new FormData();f.append('file',new Blob([audio],{type:mime}),'answer.'+(mime.includes('mp4')?'mp4':mime.includes('wav')?'wav':mime.includes('ogg')?'ogg':'webm'));f.append('model',env.TRANSCRIPTION_MODEL||'gpt-4o-mini-transcribe');
-  const tr=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:f,signal:AbortSignal.timeout(90000)});
+  const tr=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',redirect:'error',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:f,signal:AbortSignal.timeout(90000)});
   if(!tr.ok)throw await providerFailure(tr,'OpenAI transcription');text=((await tr.json()) as any).text||text;if(!text.trim())throw new Error('EMPTY_TRANSCRIPT');}
-  const res=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:JSON.stringify({model:env.AI_MODEL||'gpt-4.1-mini',store:false,instructions:system,input:`${prompt}\nIndependent audio transcription: ${text}\nNo audio supplied to assessment model. Do not assess pronunciation or acoustic fluency.`,text:{format:{type:'json_object'}},max_output_tokens:10000}),signal:AbortSignal.timeout(90000)});
+  const res=await fetch('https://api.openai.com/v1/responses',{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:JSON.stringify({model:env.AI_MODEL||'gpt-4.1-mini',store:false,instructions:system,input:`${prompt}\nIndependent audio transcription: ${text}\nNo audio supplied to assessment model. Do not assess pronunciation or acoustic fluency.`,text:{format:{type:'json_object'}},max_output_tokens:10000}),signal:AbortSignal.timeout(90000)});
   if(!res.ok)throw await providerFailure(res,provider==='gemini'?'Gemini':'OpenAI');const json:any=await res.json();raw=json.output?.flatMap((v:any)=>v.content||[]).filter((v:any)=>v.type==='output_text').map((v:any)=>v.text).join('')||'';
  }
  const decoded=JSON.parse(raw.replace(/^```json\s*|\s*```$/g,''));

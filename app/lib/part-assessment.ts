@@ -23,7 +23,7 @@ Use the EXACT questionId supplied immediately before that question's audio. The 
  }
  const model=env.AI_MODEL||'gemini-2.5-flash';
  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
-  method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
+  method:'POST',redirect:'error',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
   body:JSON.stringify({systemInstruction:{parts:[{text:instructions}]},contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',temperature:0.15,maxOutputTokens:9000}}),
   signal:AbortSignal.timeout(110000)
  });

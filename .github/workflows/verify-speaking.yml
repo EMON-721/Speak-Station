@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
@@ -28,6 +30,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Block known high and critical dependency advisories
+        run: pnpm audit --audit-level high
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Speaking-book and part-level assessment tests
@@ -40,6 +44,8 @@ jobs:
         run: node scripts/tests/verify-real-content.mjs
       - name: Verify all D1 migrations and progress storage
         run: python3 scripts/tests/verify-d1-migrations.py
+      - name: API authorization, privacy and upload boundaries
+        run: node scripts/tests/verify-security.mjs
       - name: Google OAuth and protected identity security tests
         run: node scripts/tests/verify-google-oauth.mjs
       - name: Enforce verified Google owner-only admin access
@@ -69,6 +75,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0

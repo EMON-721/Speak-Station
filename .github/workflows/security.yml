@@ -1,0 +1,38 @@
+name: Source privacy and credential protection
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source_privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reject tracked private data and credential files
+        run: node scripts/check-private-files.mjs
+      - name: Install checksum-verified Gitleaks (no repository secrets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output gitleaks.tar.gz
+          echo '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz' | sha256sum --check --status
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan all available Git history (fully redacted, no public report upload)
+        run: '"$RUNNER_TEMP/gitleaks" git --log-opts="--all" --redact=100 --ignore-gitleaks-allow --no-banner --no-color --max-archive-depth=2 .'

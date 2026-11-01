@@ -48,3 +48,33 @@ yarn-error.log*
 /wrangler.cloudflare.generated.jsonc
 
 /wrangler.cloudflare.setup.generated.json
+
+# Private runtime data, credentials, exports and debugging output.
+*.log
+*.log.*
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+*.env
+*.env.*
+!*.env.example
+/backups/
+/backup/
+/dumps/
+/private/
+/credentials/
+/artifacts/
+/test-results/
+/playwright-report/
+*.sql.gz
+*.sql.zip
+# Templates may document names and obvious placeholders only.
+!.env.example
