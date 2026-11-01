@@ -60,7 +60,7 @@ jobs:
 
   browser_qa:
     name: Desktop and mobile browser QA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check
     timeout-minutes: 20
     steps:
