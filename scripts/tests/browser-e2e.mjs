@@ -12,11 +12,12 @@ const checks=[];
 function record(name,status,detail=''){checks.push({name,status,detail});console.log(status,name,detail)}
 let profile={name:'QA Learner',phone:'',target:'8.0',track:210,exam_date:''};
 let tests=[];
+let adminMode=false;
 let assessmentCalls={1:0,2:0,3:0};
 const fakeState=()=>({user:{id:'qa-user',name:'QA Learner',email:'qa@example.test'},profile,
  authProvider:'Google',content:defaultContent,contentRevision:0,attempts:[],saved:[],completed:[],activityDays:[],tests,
  streak:0,stage:{type:'daily',day:1},cooldowns:[],weeklyPassBand:6,aiConfigured:true,connection:{configured:true,source:'qa-mock'},
- storageReady:true,audioStorageReady:false,learningStorage:'progress-only',messages:[],isAdmin:false});
+ storageReady:true,audioStorageReady:false,learningStorage:'progress-only',messages:[],isAdmin:adminMode});
 const fakeCriteria=()=>Object.fromEntries(['fluency','lexical','grammar','pronunciation'].map(k=>[k,{observation:'Clear evidence in audio',score:6,evidence:['Speech was understandable'],drill:'Practise this answer once more.'}]));
 const reply=async(route,payload,status=200)=>route.fulfill({status,contentType:'application/json; charset=utf-8',body:JSON.stringify(payload)});
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
@@ -42,6 +43,9 @@ await page.route('**/api/**',async route=>{
  if(path==='/api/state')return reply(route,fakeState());
  if(path==='/api/questions')return reply(route,{questions});
  if(path==='/api/content')return reply(route,{content:defaultContent});
+ if(path==='/api/admin/overview')return reply(route,{administratorEmail:'qa@example.test',users:[],messages:[],activity:[]});
+ if(path==='/api/admin/diagnostics')return reply(route,{checks:[{name:'Owner Google session and authorization',status:'pass',detail:'Verified test session'},{name:'Production D1 transactional write and cleanup',status:'pass',detail:'Verified test database'},{name:'AI credential available',status:'pass',detail:'Verified test provider'}],passed:3,total:3,verifiedAt:new Date().toISOString()});
+ if(path==='/api/integration/test')return reply(route,{model:'qa-mocked-model',corrections:2,vocabulary:1,sampleCorrection:'I have lived here for five years.'});
  if(path==='/api/profile'){
   const body=JSON.parse(req.postData()||'{}');
   profile={...profile,name:body.name||'QA Learner',phone:body.phone||'',target:body.target||'8.0',track:Number(body.track)||210,exam_date:body.examDate||''};
@@ -180,6 +184,24 @@ try{
   assert((await page.locator('.modal[role="dialog"] .practice-result').innerText()).includes('6.0 / 9'));
   for(const part of [1,2,3])assert.equal(assessmentCalls[part],1,'no repeated Part '+part+' assessment');
   await capture('complete-three-part-mock');
+ });
+
+
+ await verify('Owner-only live diagnostics UI, D1, AI text/audio and microphone buttons (mock services)',async()=>{
+  adminMode=true;
+  await page.goto(ORIGIN,{waitUntil:'domcontentloaded'});
+  await page.locator('.owner-bar').waitFor({state:'visible'});
+  await page.getByRole('button',{name:'Open admin workspace'}).click();
+  await page.getByRole('button',{name:'Live Diagnostics'}).click();
+  await page.getByRole('button',{name:/Run production Google session/}).click();
+  await page.getByText(/Production checks: 5 passed/).waitFor();
+  assert.equal(await page.locator('.admin-qa-pass').count(),5);
+  await page.getByRole('button',{name:/Test my real microphone/}).click();
+  await page.clock.runFor(4700);
+  await page.getByText('Microphone-to-AI transcription passed with your device.').waitFor();
+  assert.equal(await page.locator('.admin-qa-pass').count(),6);
+  await capture('owner-diagnostics-simulated');
+  adminMode=false;
  });
 
  assert.equal(browserErrors.length,0,'No JavaScript page crashes: '+browserErrors.slice(0,3).join(' | '));
