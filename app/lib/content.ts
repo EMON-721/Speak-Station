@@ -17,6 +17,8 @@ export async function readContent(db:D1Database){const r=await db.prepare("SELEC
 // Harmonize previously shipped copper, brown, navy and saturated legacy palettes.
 const legacyAccents=['#e9b477','#8298ef','#609a7a','#3265c7','#dc9867','#ce8558','#b388ff','#376fc9'];
 if(legacyAccents.includes(content.theme.accent.toLowerCase()))content.theme={...content.theme,...(defaultContent as SiteContent).theme,fontSize:content.theme.fontSize,questionSize:content.theme.questionSize,headingFont:content.theme.headingFont,bodyFont:content.theme.bodyFont};
+// Keep concise speaking guidelines at the bottom, including accounts with older CMS orders.
+if(content.sectionOrder.includes('academy'))content.sectionOrder=[...content.sectionOrder.filter(id=>id!=='academy'),'academy'];
 return content;}catch{return defaultContent as SiteContent;}}
 export function estimatedBand(feedback:any){const values=['fluency','lexical','grammar','pronunciation'].map(k=>feedback?.criteria?.[k]?.score);return values.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=9)?Math.round(values.reduce((a,b)=>a+b,0)/4*2)/2:null;}
 export function stageQuestions(day:number,kind:string,bank:any[],content:SiteContent,fallback:(day:number,bank:any[])=>any[]){const exam=content.exams.find(e=>e.kind===kind&&e.day===day);return exam?.questionIds.length?exam.questionIds.map(id=>bank.find(q=>q.id===id)).filter(Boolean):fallback(day,bank);}

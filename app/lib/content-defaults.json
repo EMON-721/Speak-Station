@@ -620,10 +620,10 @@
     "topics",
     "exams",
     "revision",
-    "academy",
     "progress",
     "attempts",
-    "contact"
+    "contact",
+    "academy"
   ],
   "topics": [
     "Education",
