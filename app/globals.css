@@ -664,3 +664,16 @@ body{background:#111214;color:#F2F3F5}
   .homepage-shell .main-content{box-sizing:border-box;min-width:0;max-width:100%}
   .homepage-shell .home-section{min-width:0;max-width:100%}
 }
+
+/* Owner-only diagnostics: use a compact, legible status grid; never expose credentials. */
+.admin-console .admin-qa-actions{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
+.admin-console .admin-qa-actions button{flex:0 1 auto;white-space:normal;text-align:center;min-height:44px}
+.admin-console .admin-qa-timestamp{font-size:12px;color:var(--muted,#9fa7b3)}
+.admin-console .admin-qa-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.admin-console .admin-qa-results>div{padding:15px;background:var(--panel,#22252b);border:1px solid var(--line,#4a4e57);border-radius:10px;min-width:0}
+.admin-console .admin-qa-results strong{font-size:13px;line-height:1.55}
+.admin-console .admin-qa-results p{font-size:12px;overflow-wrap:anywhere;line-height:1.65;margin:7px 0 0}
+.admin-console .admin-qa-pass{border-left:3px solid #78b69d!important}
+.admin-console .admin-qa-fail{border-left:3px solid #df8c8c!important}
+.admin-console .admin-qa-manual{border-left:3px solid #afbac9!important}
+@media(max-width:700px){.admin-console .admin-qa-results{grid-template-columns:1fr}.admin-console .admin-qa-actions button{width:100%}}
