@@ -16,7 +16,7 @@ let adminMode=false;
 let scheduledBegins=0;
 const eligibleSchedule={practice:{allowed:true,nextAt:null,reason:'Ready to begin',recentCount:0,modulesCompleted:2},test:{allowed:true,nextAt:null,reason:'Ready to begin',recentCount:0,modulesCompleted:2}};
 let assessmentCalls={1:0,2:0,3:0};
-const fakeState=()=>({user:{id:'qa-user',name:'QA Learner',email:'qa@example.test'},profile,
+const fakeState=()=>({user:{id:'qa-user',name:'QA Learner',email:'qa@example.test',memberNumber:1},profile,
  authProvider:'Google',content:defaultContent,contentRevision:0,attempts:[],saved:[],completed:[],activityDays:[],tests,
  streak:0,stage:{type:'daily',day:1},cooldowns:[],scheduling:eligibleSchedule,weeklyPassBand:6,aiConfigured:true,connection:{configured:true,source:'qa-mock'},
  storageReady:true,audioStorageReady:false,learningStorage:'progress-only',messages:[],isAdmin:adminMode});
@@ -118,6 +118,7 @@ try{
   await page.locator('.profile-trigger').click();
   await page.locator('.profile-form').waitFor({state:'visible'});
   assert((await page.locator('.profile-identifiers').innerText()).includes('qa@example.test'));
+  assert((await page.locator('.profile-heading h3').innerText()).includes('#1'),'joining number beside profile name');
   await page.getByLabel('Your name',{exact:true}).fill('QA Updated');
   await page.getByRole('button',{name:/Save my preferences/}).click();
   await page.getByText('Your learning preferences are saved.').waitFor();

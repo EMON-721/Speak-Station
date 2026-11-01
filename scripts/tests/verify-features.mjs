@@ -40,3 +40,10 @@ assert(policy.includes('TEST_INTERVAL_MS=7*24*60*60*1000'));
 assert(ui.includes("api('begin-session'"),'session start must be admitted by D1');
 assert(api.includes('requireStudySession('),'AI assessment and score submission must verify the server-issued session');
 console.log('PASS: server-enforced study schedules and quota display preserved');
+
+assert(ui.includes('member-number'),'profile name retains joining number');
+assert(ui.includes('data.user.memberNumber'),'user number appears in profile');
+assert(api.includes('INSERT OR IGNORE INTO member_numbers'),'member number assigned only once');
+assert(api.includes('member_number FROM member_numbers WHERE user_id=?'),'member number lookup is user-scoped');
+assert(api.includes("started_at>?)<3"),'D1 enforces three practices in a rolling day');
+console.log('PASS: numbered private profiles and server-side three-practice limit');

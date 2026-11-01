@@ -688,3 +688,9 @@ body{background:#111214;color:#F2F3F5}
 .homepage-shell .session-limit-counters span{display:inline-block;padding:7px 10px;border:1px solid #454b54;border-radius:8px;font-size:11px;color:#edf0f4;background:#30343b}
 .homepage-shell .session-limit-panel p{width:100%;margin:0;font-size:12px;line-height:1.55;color:#ecdbbd}
 @media(max-width:680px){.homepage-shell .session-limit-panel{padding:13px}.homepage-shell .session-limit-counters{width:100%}}
+
+
+/* Permanent joining number appears beside the profile name without exposing private IDs. */
+.profile-heading h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.profile-heading .member-number{display:inline-flex;align-items:center;padding:2px 9px;border:1px solid #697a7c;border-radius:999px;background:#303b3d;color:#eef6f5;font-size:12px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
+.profile-trigger-text strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}

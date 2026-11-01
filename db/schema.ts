@@ -14,3 +14,6 @@ export const messages=sqliteTable('messages',{id:text('id').primaryKey(),userId:
 export const questionCooldowns=sqliteTable('question_cooldowns',{userId:text('user_id').notNull(),questionId:text('question_id').notNull(),availableAt:text('available_at').notNull()},t=>[primaryKey({columns:[t.userId,t.questionId]})]);
 
 export const studySessions=sqliteTable('study_sessions',{id:text('id').primaryKey(),userId:text('user_id').notNull(),category:text('category').notNull(),kind:text('kind').notNull(),day:integer('day').notNull(),mode:text('mode').notNull(),startedAt:text('started_at').notNull(),expiresAt:text('expires_at').notNull(),completedAt:text('completed_at')});
+
+// Sequential, stable public member number; private Google user_id is stored separately.
+export const memberNumbers=sqliteTable('member_numbers',{memberNumber:integer('member_number').primaryKey({autoIncrement:true}),userId:text('user_id').notNull().unique()});

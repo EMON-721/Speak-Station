@@ -18,13 +18,14 @@ Speak Station is a browser-based **English speaking and IELTS-style practice pla
 | Complete speaking books | **240 IELTS-style books**, each combining all three speaking parts |
 | Question collection | Thousands of speaking prompts across familiar, social and abstract topics |
 | Daily speaking | Structured practice sessions and selectable learning-track lengths |
-| Practice admission | One full three-part practice every **6 hours**, maximum **4 starts in any rolling 24 hours** |
+| Practice admission | One full three-part practice every **6 hours**, maximum **3 starts in any rolling 24 hours** |
 | Test admission | One test start every **7 days** (weekly, revision or exam-mode book), only after **2 distinct modules completed within the last 7 days** |
 | Weekly exams | **30 sequential weekly tests** with a minimum pass band of **6.0/9** |
 | Revision checkpoints | **15 revision exams**; a revision is required after every two passed weekly tests |
 | Sample mock | A **preview-only** example of speaking parts and expected timings, without starting an exam |
 | AI assessment | One complete assessment **per speaking part**, with question-by-question feedback |
 | Personal progress | Part 1, Part 2, Part 3 and combined overall estimated band for completed sessions |
+| Member number | Permanent join-order number beside the learner's profile name (for example, #1, #2) |
 | Question cooldown | Answered **book-practice questions** rest for **15 days** before becoming available again |
 
 ## Three-part speaking format
@@ -71,7 +72,7 @@ AI transcription may mishear words; an unclear recording does not justify invent
 
 To protect the learning routine and API budget, all newly started sessions must be admitted by the **Cloudflare D1 server**, not merely an enabled button. A full practice containing Parts 1, 2 and 3 counts as **one** session.
 
-- **Practice:** one start at least **six hours after the previous practice start**; never more than **four starts in the preceding 24 hours**.
+- **Practice:** one start at least **six hours after the previous practice start**; never more than **three starts in the preceding 24 hours**.
 - **Tests:** one start at least **seven days after the previous test start**, shared across Weekly, Revision and Book Exam modes.
 - **Required preparation:** a test needs **two distinct completed speaking modules in the preceding seven days**. Both completed Daily Modules and completed Speaking Practice Books count; simply opening questions does not count.
 - A started session consumes a slot even if abandoned, because refreshing the browser cannot bypass the time limit. An unfinished session can be resumed for the same module inside its 24-hour validity; after expiry a newly admitted slot is required.
@@ -181,3 +182,8 @@ The verification workflow checks TypeScript, speaking-book and progression tests
 ---
 
 © 2026 Speak Station. All rights reserved.
+
+
+### Member numbers
+
+Each Google user receives a permanent numeric joining number, visible beside their own name in Profile and the profile header. Existing members are ordered by available profile creation time during the migration, and new numbers are assigned atomically on authenticated requests. Numbers are never reassigned or reused. These display numbers do not replace private Google account identifiers.

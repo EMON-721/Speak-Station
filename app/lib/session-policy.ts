@@ -2,7 +2,7 @@
 export const PRACTICE_INTERVAL_MS=6*60*60*1000;
 export const PRACTICE_DAY_MS=24*60*60*1000;
 export const TEST_INTERVAL_MS=7*24*60*60*1000;
-export const MAX_PRACTICES_PER_24H=4;
+export const MAX_PRACTICES_PER_24H=3;
 export const REQUIRED_WEEKLY_MODULES=2;
 export type SessionRow={category:'practice'|'test';started_at:string};
 export type ModuleRow={module:string;completed_at:string};
@@ -18,7 +18,7 @@ export function eligibility(category:'practice'|'test',sessions:SessionRow[],mod
  let reason='';
  if(category==='practice'){
   if(times.length&&times[0]+PRACTICE_INTERVAL_MS>earliest){earliest=times[0]+PRACTICE_INTERVAL_MS;reason='Only one complete practice can start every six hours.'}
-  if(recent.length>=MAX_PRACTICES_PER_24H&&recent[recent.length-MAX_PRACTICES_PER_24H]+PRACTICE_DAY_MS>earliest){earliest=recent[recent.length-MAX_PRACTICES_PER_24H]+PRACTICE_DAY_MS;reason='A maximum of four complete practices is allowed in any rolling 24 hours.'}
+  if(recent.length>=MAX_PRACTICES_PER_24H&&recent[recent.length-MAX_PRACTICES_PER_24H]+PRACTICE_DAY_MS>earliest){earliest=recent[recent.length-MAX_PRACTICES_PER_24H]+PRACTICE_DAY_MS;reason='A maximum of three complete practices is allowed in any rolling 24 hours.'}
  }else{
   if(modulesCompleted<REQUIRED_WEEKLY_MODULES)return {allowed:false,nextAt:null,reason:'Complete two different speaking modules in the last seven days before starting a test.',recentCount:recent.length,modulesCompleted};
   if(times.length&&times[0]+TEST_INTERVAL_MS>earliest){earliest=times[0]+TEST_INTERVAL_MS;reason='Only one weekly, revision or book test can start every seven days.'}
