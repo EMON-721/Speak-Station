@@ -7,6 +7,7 @@ import {getChatGPTUser} from '../../chatgpt-auth';
 import {questions,byId,dailyQuestions,examQuestions,type Question} from '../../lib/questions';
 import {nextStage,streak} from '../../lib/learning';
 import {WEEKLY_PASS_BAND,weeklyGate,cooldownUntil,passedTest} from '../../lib/weekly-policy';
+import {eligibility,PRACTICE_INTERVAL_MS,PRACTICE_DAY_MS,TEST_INTERVAL_MS,type SessionRow,type ModuleRow} from '../../lib/session-policy';
 import {assess} from '../../lib/assessment';
 import {assessSpeakingPart,type PartAnswer} from '../../lib/part-assessment';
 import {transcribeAudio,validAudio,audioMime} from '../../lib/transcription';
@@ -52,14 +53,43 @@ async function cleanupOldAudio(){
  const expired=await rows('SELECT id,audio_key FROM attempts WHERE created_at<? LIMIT 50',cutoff);
  for(const item of expired){try{if(item.audio_key)await E().BUCKET?.delete(item.audio_key)}catch{}await execute('DELETE FROM attempts WHERE id=?',item.id)}
 }
+
+async function studyHistory(uid:string){
+ const [sessions,days,books,legacy]=await Promise.all([
+  rows('SELECT id,category,kind,day,mode,started_at,expires_at,completed_at FROM study_sessions WHERE user_id=? ORDER BY started_at DESC LIMIT 250',uid),
+  rows('SELECT day,completed_at FROM days WHERE user_id=?',uid),
+  rows("SELECT milestone,completed_at FROM tests WHERE user_id=? AND kind='book'",uid),
+  rows("SELECT kind,milestone,completed_at FROM tests WHERE user_id=? AND kind IN ('weekly','revision','book-exam')",uid)
+ ]);
+ const modules:ModuleRow[]=[
+  ...days.map(d=>({module:'daily:'+d.day,completed_at:d.completed_at})),
+  ...books.map(t=>({module:'book:'+t.milestone,completed_at:t.completed_at}))
+ ];
+ // Protect accounts upgraded from older versions, without double-counting new sessions.
+ const recentLegacy:SessionRow[]=legacy.filter(t=>!sessions.some(x=>x.category==='test'&&x.kind===t.kind&&x.day===t.milestone&&Math.abs(Date.parse(x.started_at)-Date.parse(t.completed_at))<86400000)).map(t=>({category:'test',started_at:t.completed_at}));
+ return {sessions,modules,legacy:recentLegacy};
+}
+async function studyQuota(uid:string){
+ const {sessions,modules,legacy}=await studyHistory(uid);
+ return {
+  practice:eligibility('practice',sessions,modules),
+  test:eligibility('test',[...sessions,...legacy],modules)
+ };
+}
+async function requireStudySession(uid:string,id:string,kind:string,day:number,mode:string){
+ if(!id)return null;
+ const found=(await rows('SELECT id,category,kind,day,mode,started_at,expires_at,completed_at FROM study_sessions WHERE id=? AND user_id=?',id,uid))[0];
+ if(!found||found.kind!==kind||found.day!==day||found.mode!==mode||found.completed_at||Date.parse(found.expires_at)<=Date.now())return null;
+ return found;
+}
 async function learningContext(uid:string){const [profiles,days,tests,content]=await Promise.all([rows('SELECT track FROM profiles WHERE user_id=?',uid),rows('SELECT day FROM days WHERE user_id=?',uid),rows('SELECT kind,milestone,answers FROM tests WHERE user_id=?',uid),readContent(db())]);return {content,stage:nextStage(days.map(d=>d.day),tests,profiles[0]?.track||210,content.exams)};}
 async function state(user:any){
  const authProvider=E().AUTH_MODE==='google'?'Google':'ChatGPT';const connection=await connectionStatus(E(),db());const content=await readContent(db());const revisionRow=await rows("SELECT value FROM settings WHERE key='site_content_revision'");const contentRevision=Number(revisionRow[0]?.value||0);
- if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],activityDays:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,connection,storageReady:!!E().DB,audioStorageReady:false,learningStorage:'progress-only',isAdmin:false};
+ if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],activityDays:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,connection,storageReady:!!E().DB,audioStorageReady:false,learningStorage:'progress-only',scheduling:{practice:eligibility('practice',[],[]),test:eligibility('test',[],[])},isAdmin:false};
  await execute('INSERT OR IGNORE INTO profiles (user_id,name,track,created_at) VALUES (?,?,?,?)',user.userId,user.displayName,210,now());
  const [profiles,attempts,saved,days,tests,cooldowns]=await Promise.all([rows('SELECT * FROM profiles WHERE user_id=?',user.userId),rows('SELECT * FROM attempts WHERE user_id=? AND created_at>=? ORDER BY created_at DESC LIMIT 100',user.userId,new Date(Date.now()-86400000).toISOString()),rows('SELECT * FROM saved WHERE user_id=?',user.userId),rows('SELECT * FROM days WHERE user_id=? ORDER BY day',user.userId),rows('SELECT * FROM tests WHERE user_id=?',user.userId),activeCooldowns(user.userId)]);
  const complete=days.map(d=>d.day);
- return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,activityDays:days.map(d=>({day:d.day,completedAt:d.completed_at})),tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
+ return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,activityDays:days.map(d=>({day:d.day,completedAt:d.completed_at})),tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,scheduling:await studyQuota(user.userId),weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
 }
 async function handler(req:Request){
  const path=new URL(req.url).pathname.replace(/^\/api\//,'');const user=await getChatGPTUser();
@@ -93,6 +123,49 @@ async function handler(req:Request){
   return new Response(object.body,{headers:{'Content-Type':a.mime,'Cache-Control':'private, no-store','Content-Disposition':`inline; filename="speak-station-${a.id}.${a.mime.includes('mp4')?'mp4':a.mime.includes('ogg')?'ogg':'webm'}"`,'X-Content-Type-Options':'nosniff'}});
  }
  if(req.method==='GET'&&path==='export')return response(await state(user));
+ if(req.method==='POST'&&path==='begin-session'){
+  const input=z.object({kind:z.enum(['free','daily','weekly','revision']),day:z.number().int().min(1).max(1000),mode:z.enum(['practice','exam'])}).parse(await req.json());
+  const {kind,day,mode}=input,category: 'practice'|'test'=(kind==='weekly'||kind==='revision'||mode==='exam')?'test':'practice';
+  if(kind!=='free'&&mode!==(kind==='daily'?'practice':'exam'))return fail('Invalid speaking session mode.',400);
+  if(kind==='free'){
+   const bank=await allQuestions(),book=buildSpeakingBooks(bank,240)[day-1];
+   if(!book||day>240)return fail('Speaking book unavailable.',404);
+   if(mode==='practice'){
+    const locked=new Set((await activeCooldowns(uid)).map(x=>x.question_id));
+    if(book.questions.some(q=>locked.has(q.id)))return fail('Book questions are on their 15-day cooldown.',409);
+   }
+  }else{
+   const context=await learningContext(uid);
+   if(kind==='daily'&&(context.stage.type!==kind||context.stage.day!==day))return fail('Finish the current required stage first.',409);
+   if(kind!=='daily'){
+    const exam=context.content.exams.find(x=>x.kind===kind&&x.day===day);
+    if(!exam)return fail('Unknown weekly or revision exam.',404);
+    const previous=await rows('SELECT kind,milestone,answers FROM tests WHERE user_id=?',uid);
+    const gate=weeklyGate(previous,kind,exam.number);
+    if(!gate.unlocked)return fail(gate.reason,409);
+    if(previous.some(t=>t.kind===kind&&t.milestone===day&&passedTest(t)))return fail('Exam already passed.',409);
+   }
+  }
+  const history=await studyHistory(uid),timestamp=now();
+  const resumable=history.sessions.find((row:any)=>row.kind===kind&&row.day===day&&row.mode===mode&&!row.completed_at&&row.expires_at>timestamp);
+  if(resumable)return response({sessionId:resumable.id,startedAt:resumable.started_at,expiresAt:resumable.expires_at,resumed:true,scheduling:await studyQuota(uid)});
+  const check=eligibility(category,[...history.sessions,...history.legacy],history.modules);
+  if(!check.allowed)return response({error:check.reason,nextAt:check.nextAt,modulesCompleted:check.modulesCompleted},429);
+  const sessionId=crypto.randomUUID(),expiresAt=new Date(Date.now()+86400000).toISOString();
+  const cutoff6=new Date(Date.now()-PRACTICE_INTERVAL_MS).toISOString();
+  const cutoff24=new Date(Date.now()-PRACTICE_DAY_MS).toISOString();
+  const cutoff7=new Date(Date.now()-TEST_INTERVAL_MS).toISOString();
+  // Atomic D1 admission: two simultaneous tabs cannot both consume the same slot.
+  const sql=category==='practice'?
+   "INSERT INTO study_sessions(id,user_id,category,kind,day,mode,started_at,expires_at) SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM study_sessions WHERE user_id=? AND category='practice' AND started_at>?) AND (SELECT COUNT(*) FROM study_sessions WHERE user_id=? AND category='practice' AND started_at>?)<4":
+   "INSERT INTO study_sessions(id,user_id,category,kind,day,mode,started_at,expires_at) SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM study_sessions WHERE user_id=? AND category='test' AND started_at>?)";
+  const values=category==='practice'?[sessionId,uid,category,kind,day,mode,timestamp,expiresAt,uid,cutoff6,uid,cutoff24]:
+   [sessionId,uid,category,kind,day,mode,timestamp,expiresAt,uid,cutoff7];
+  const admission=await execute(sql,...values);
+  if(!admission.meta.changes)return response({error:'Another session just used this time slot. Refresh to see the next available time.',scheduling:await studyQuota(uid)},429);
+  return response({sessionId,startedAt:timestamp,expiresAt,resumed:false,scheduling:await studyQuota(uid)});
+ }
+
  if(path==='integration'&&req.method==='POST'){
   if(!admin)return fail('Only the site owner can connect an AI provider.',403);
   if(!E().CREDENTIAL_ENCRYPTION_KEY)return fail('Secure credential storage is not configured.',503);
@@ -114,6 +187,7 @@ async function handler(req:Request){
  if(path==='transcribe'&&req.method==='POST'){
   const config=await aiConfiguration(E(),db());if(!(config.GEMINI_API_KEY||config.OPENAI_API_KEY))return fail('Connect AI to enable automatic audio transcription.',503);
   const f=await req.formData(),audio=f.get('audio'),language=String(f.get('language')||'auto');
+  if(!admin){const sessionId=String(f.get('sessionId')||'');const active=(await rows('SELECT id FROM study_sessions WHERE id=? AND user_id=? AND completed_at IS NULL AND expires_at>?',sessionId,uid,now()))[0];if(!active)return fail('Start an eligible practice session before transcribing audio.',429)}
   if(!['auto','en-US','bn-BD'].includes(language))return fail('Choose a supported transcription language.');
   if(!(audio instanceof File)||audio.size<500||audio.size>8*1024*1024||!/^audio\/(webm|ogg|mp4|wav|mpeg)$/.test(audioMime(audio.type)))return fail('Use an audio recording of up to 8 MB.');
   const bytes=await audio.arrayBuffer();if(!validAudio(bytes))return fail('This file is not a supported audio recording.');
@@ -132,8 +206,11 @@ async function handler(req:Request){
    day:z.number().int().min(0).max(1000),
    part:z.union([z.literal(1),z.literal(2),z.literal(3)]),
    bookNumber:z.number().int().min(1).max(240).optional(),
+   sessionId:z.string().uuid(),
    answers:z.array(z.object({questionId:z.string().min(1).max(120),transcript:z.string().max(8000),duration:z.number().min(3).max(900)})).min(1).max(8)
   }).parse(JSON.parse(String(form.get('meta')||'{}')))}catch{return fail('Invalid speaking part details.',400)}
+  const activeStudy=await requireStudySession(uid,meta.sessionId,meta.kind,meta.day,meta.kind==='free'?((await rows('SELECT mode FROM study_sessions WHERE id=? AND user_id=?',meta.sessionId,uid))[0]?.mode||'practice'):meta.kind==='daily'?'practice':'exam');
+  if(!activeStudy)return fail('This practice or test session is unavailable or expired.',429);
   const ids=meta.answers.map((a:any)=>a.questionId);
   if(new Set(ids).size!==ids.length)return fail('Each speaking question must be unique.',400);
   const bank=await allQuestions();
@@ -185,7 +262,7 @@ async function handler(req:Request){
    const issues=compactIssueCounts(feedback),durationSeconds=Math.round(answers.reduce((total,item)=>total+item.duration,0));
    const receipts=await Promise.all(answers.map(async item=>{
     const id=crypto.randomUUID();
-    const receipt=await issueReceipt({id,userId:uid,questionId:item.question.id,kind:meta.kind,day:meta.day,recorded:true,reviewed:true,scores,issues,durationSeconds,exp:Date.now()+12*3600000},receiptSecret());
+    const receipt=await issueReceipt({id,userId:uid,questionId:item.question.id,kind:meta.kind,day:meta.day,sessionId:meta.sessionId,recorded:true,reviewed:true,scores,issues,durationSeconds,exp:Date.now()+12*3600000},receiptSecret());
     return {id,questionId:item.question.id,receipt};
    }));
    if(meta.kind==='free'){
@@ -196,6 +273,8 @@ async function handler(req:Request){
   }catch(error){return fail(assessmentFailureMessage(error),502)}
  }
  if(path==='submit'&&req.method==='POST'){
+  // Deprecated individual-question submissions cannot bypass complete-session quotas.
+  return fail('Start a complete, scheduled speaking practice or test session instead.',410);
   const config=await aiConfiguration(E(),db());if(!(config.OPENAI_API_KEY||config.GEMINI_API_KEY))return fail('Connect Google AI Studio in AI connection first. Your recording stays on this device.',503);
   const f=await req.formData();const bank=await allQuestions();const q=bank.find(q=>q.id===String(f.get('questionId')));if(!q)return fail('Question not found.',404);
   const audio=f.get('audio');const typed=String(f.get('typed')||'').slice(0,20000);const transcript=String(f.get('transcript')||'').slice(0,20000);const duration=Math.round(Number(f.get('duration')||0));const kind=String(f.get('kind')||'free'),day=Number(f.get('day')||0);const hasAudio=audio instanceof File;
@@ -218,9 +297,12 @@ async function handler(req:Request){
  }
  if(req.method==='POST'&&path==='message'){const b=z.object({subject:z.string().min(3).max(160),body:z.string().min(10).max(5000)}).parse(await req.json());if(/[\u0980-\u09ff]/.test(b.subject+b.body))return fail('Please write your message in English.');const recent=await rows('SELECT id FROM messages WHERE user_id=? AND created_at>?',uid,new Date(Date.now()-3600000).toISOString());if(recent.length>=5)return fail('You can send up to five support messages per hour.',429);await execute("INSERT INTO messages (id,user_id,subject,body,reply,status,created_at) VALUES (?,?,?,?,'','open',?)",crypto.randomUUID(),uid,b.subject,b.body,now());return response({ok:true});}
  if(req.method==='POST'&&path==='practice-result'){
-  const b=z.object({receipts:z.array(z.string().max(4000)).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20),bookNumber:z.number().int().min(1).max(240).optional(),bookMode:z.enum(['practice','exam']).optional()}).parse(await req.json());
+  const b=z.object({receipts:z.array(z.string().max(4000)).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20),bookNumber:z.number().int().min(1).max(240).optional(),bookMode:z.enum(['practice','exam']).optional(),sessionId:z.string().uuid()}).parse(await req.json());
   const receipts=await Promise.all(b.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed))return fail('Record, assess and review every test answer first.',409);
-  const valid=receipts as PracticeReceipt[];if(new Set(b.questionIds).size!==b.questionIds.length||new Set(valid.map(r=>r.questionId)).size!==b.questionIds.length||valid.length!==b.questionIds.length||valid.some(r=>!b.questionIds.includes(r.questionId)))return fail('Each distinct test question needs its own reviewed answer.',409);
+  const valid=receipts as PracticeReceipt[];
+  const sessionMode=b.bookMode||'practice',active=await requireStudySession(uid,b.sessionId,'free',b.bookNumber||0,sessionMode);
+  if(!active||valid.some(r=>r.sessionId!==b.sessionId))return fail('This practice/test slot has expired or was already completed.',429);
+  if(new Set(b.questionIds).size!==b.questionIds.length||new Set(valid.map(r=>r.questionId)).size!==b.questionIds.length||valid.length!==b.questionIds.length||valid.some(r=>!b.questionIds.includes(r.questionId)))return fail('Each distinct test question needs its own reviewed answer.',409);
   const bank=await allQuestions();if(![1,2,3].every(p=>b.questionIds.some(id=>bank.find(q=>q.id===id)?.part===p)))return fail('A speaking test must include all three parts.',409);
   const threshold=(await readContent(db())).passBand;
   const result=summarizeSpeakingParts(valid,bank.filter(q=>b.questionIds.includes(q.id)),threshold);
@@ -228,18 +310,23 @@ async function handler(req:Request){
   const book=buildSpeakingBooks(bank,240)[b.bookNumber-1];
   if(!book||book.questions.length!==b.questionIds.length||book.questions.some((q,i)=>q.id!==b.questionIds[i]))return fail('This speaking book has changed. Restart with the current question collection.',409);
   const partScores=result.partScores;
-  const mode=b.bookMode||'practice';
-  await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',
-   crypto.randomUUID(),uid,b.bookNumber,mode==='exam'?'book-exam':'book',
-   JSON.stringify({bookId:book.id,topic:book.topic,practiceBand:result.band,partScores,criteria:result.criteria,issues:result.issues,durationSeconds:result.durationSeconds,answers:valid.length,passed:result.passed,mode}),now());
+  const mode=b.bookMode||'practice',finishedAt=now();
+  const resultRow=JSON.stringify({bookId:book.id,topic:book.topic,practiceBand:result.band,partScores,criteria:result.criteria,issues:result.issues,durationSeconds:result.durationSeconds,answers:valid.length,passed:result.passed,mode});
+  const writes=await db().batch([
+   db().prepare('UPDATE study_sessions SET completed_at=? WHERE id=? AND user_id=? AND completed_at IS NULL AND expires_at>?').bind(finishedAt,b.sessionId,uid,finishedAt),
+   db().prepare("INSERT INTO tests(id,user_id,milestone,kind,answers,completed_at) SELECT ?,?,?,?,?,? FROM study_sessions WHERE id=? AND user_id=? AND completed_at=?").bind(crypto.randomUUID(),uid,b.bookNumber,mode==='exam'?'book-exam':'book',resultRow,finishedAt,b.sessionId,uid,finishedAt)
+  ]);
+  if(!writes[0].meta.changes||!writes[1].meta.changes)return fail('This attempt was already completed.',409);
   return response({...result,partScores,bookNumber:b.bookNumber});
  }
  if(req.method==='POST'&&path==='complete-stage'){
-  const body=z.object({receipts:z.array(z.string().max(4000)).min(1).max(30)}).parse(await req.json());
+  const body=z.object({receipts:z.array(z.string().max(4000)).min(1).max(30),sessionId:z.string().uuid()}).parse(await req.json());
   const receipts=await Promise.all(body.receipts.map(v=>proof(v,uid)));
   if(receipts.some(r=>!r||!r.recorded||!r.reviewed))return fail('Assess all three speaking parts before completing the exam.',409);
   const valid=receipts as PracticeReceipt[],kind=valid[0].kind,day=valid[0].day;
-  if(!['daily','weekly','revision'].includes(kind)||valid.some(r=>r.kind!==kind||r.day!==day))return fail('Assessment receipts do not belong to the same session.',409);
+  if(!['daily','weekly','revision'].includes(kind)||valid.some(r=>r.kind!==kind||r.day!==day||r.sessionId!==body.sessionId))return fail('Assessment receipts do not belong to the same session.',409);
+  const active=await requireStudySession(uid,body.sessionId,kind,day,kind==='daily'?'practice':'exam');
+  if(!active)return fail('This session expired or was already completed.',429);
   const context=await learningContext(uid),bank=await allQuestions();
   let assigned:Question[];
   if(kind==='daily'){
@@ -258,13 +345,14 @@ async function handler(req:Request){
   const threshold=kind==='daily'?context.content.passBand:WEEKLY_PASS_BAND;
   const result=summarizeSpeakingParts(valid,assigned,threshold);
   const summary={passed:result.passed,practiceBand:result.band,partScores:result.partScores,criteria:result.criteria,issues:result.issues,durationSeconds:result.durationSeconds,answers:valid.length};
-  if(kind==='daily'){
-   await execute('INSERT OR IGNORE INTO days (user_id,day,completed_at) VALUES (?,?,?)',uid,day,now());
-   await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',crypto.randomUUID(),uid,day,'daily-score',JSON.stringify(summary),now());
-  }else{
-   // Failed assessments also keep their part scores, but never unlock the next exam.
-   await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',crypto.randomUUID(),uid,day,kind,JSON.stringify(summary),now());
-  }
+  const finishedAt=now(),resultId=crypto.randomUUID(),payload=JSON.stringify(summary);
+  const writes=[
+   db().prepare('UPDATE study_sessions SET completed_at=? WHERE id=? AND user_id=? AND completed_at IS NULL AND expires_at>?').bind(finishedAt,body.sessionId,uid,finishedAt),
+   db().prepare("INSERT INTO tests(id,user_id,milestone,kind,answers,completed_at) SELECT ?,?,?,?,?,? FROM study_sessions WHERE id=? AND user_id=? AND completed_at=?").bind(resultId,uid,day,kind==='daily'?'daily-score':kind,payload,finishedAt,body.sessionId,uid,finishedAt)
+  ];
+  if(kind==='daily')writes.push(db().prepare("INSERT OR IGNORE INTO days(user_id,day,completed_at) SELECT ?,?,? FROM study_sessions WHERE id=? AND user_id=? AND completed_at=?").bind(uid,day,finishedAt,body.sessionId,uid,finishedAt));
+  const saved=await db().batch(writes);
+  if(!saved[0].meta.changes||!saved[1].meta.changes)return fail('This practice or test was already completed.',409);
   return response({...await state(user),stageResult:result});
  }
  if(req.method==='POST'&&path==='save')return fail('New practice notes and feedback stay in this tab only. Use Download to keep a personal copy.',410);
