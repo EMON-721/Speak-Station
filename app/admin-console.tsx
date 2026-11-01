@@ -25,14 +25,28 @@ export default function AdminConsole({content,revision,bank,api,onSaved}:{conten
     const result=await api('integration/test',{});
     results.push({name:'Real AI feedback generation',status:'pass',detail:'Server-side model generation succeeded. Model: '+String(result.model||'configured model')});
    }catch(e){results.push({name:'Real AI feedback generation',status:'fail',detail:(e as Error).message})}
+   let referenceAudio:ArrayBuffer|null=null;
    try{
     const sample=await fetch('/transcription-check.wav',{cache:'no-store'});
     if(!sample.ok)throw Error('The sample audio could not load.');
-    const form=new FormData();form.append('audio',new Blob([await sample.arrayBuffer()],{type:'audio/wav'}),'transcription-check.wav');form.append('language','auto');
+    referenceAudio=await sample.arrayBuffer();
+    const form=new FormData();form.append('audio',new Blob([referenceAudio],{type:'audio/wav'}),'transcription-check.wav');form.append('language','auto');
     const response=await api('transcribe',form);
     if(!response.transcript?.trim())throw Error('The audio provider did not recognise the sample.');
     results.push({name:'Real audio-to-text transcription',status:'pass',detail:'Voice sample transcribed; the text is not saved in this diagnostic.'});
    }catch(e){results.push({name:'Real audio-to-text transcription',status:'fail',detail:(e as Error).message})}
+   for(const part of [1,2,3]){
+    const name='Real AI speaking Part '+part+' audio assessment';
+    try{
+     if(!referenceAudio)throw Error('A valid bundled test audio sample is required.');
+     const form=new FormData();
+     form.append('part',String(part));
+     form.append('audio',new Blob([referenceAudio],{type:'audio/wav'}),'speaking-qa.wav');
+     const result=await api('admin/part-smoke',form);
+     if(!result.ok||!result.questionMappingVerified||result.part!==part)throw Error('Question mappings were not verified.');
+     results.push({name,status:'pass',detail:'Actual AI audio assessment completed for '+result.questionCount+' questions; no learner score saved.'});
+    }catch(e){results.push({name,status:'fail',detail:(e as Error).message})}
+   }
    results.push({name:'Real device microphone capture',status:'manual',detail:'Use the separate microphone button below and speak during the recording.'});
    setLiveChecks(results);setLiveCheckedAt(new Date().toLocaleString());
    const count=results.filter(v=>v.status==='pass').length;
@@ -83,9 +97,9 @@ export default function AdminConsole({content,revision,bank,api,onSaved}:{conten
  {tab==='Learners'&&<section className="panel"><h3>Learner authority</h3><p>The owner account is protected. Every account action requires a reason and is recorded in the audit log.</p>{overview?.users.map((u:any)=><div className="cms-row" key={u.user_id}><span><strong>{u.name}</strong><small>{u.email||u.user_id} · {u.status||'active'}</small></span><button onClick={()=>run(async()=>{setLearnerDetails(await api('admin/learner?userId='+encodeURIComponent(u.user_id)));})}>View progress & feedback</button>{['ban','unban','delete-user','override-pass'].map(a=><button key={a} onClick={()=>{setTarget(u);setAction(a);setReason('')}}>{a}</button>)}</div>)}{learnerDetails&&<div className="learner-detail panel"><button onClick={()=>setLearnerDetails(null)}>Close learner details</button><h3>{learnerDetails.profile.name}</h3><p>{learnerDetails.days.length} learning days · {learnerDetails.tests.length} completed tests</p>{learnerDetails.tests.map((t:any)=><p key={t.id}>{t.kind} · day {t.milestone} · {t.details?.override?'Administrator override: '+t.details.reason:'Completed through assessment'}</p>)}{learnerDetails.attempts.map((a:any)=><details className="message-card" key={a.id}><summary>{a.question_id} · {a.status} · {a.feedback?.overall===null?'No full band estimate':a.feedback?.overall+'/9'}</summary><p>{a.transcript}</p>{a.audio_key&&<audio controls preload="none" src={'/api/audio/'+a.id}/>}<p>{a.feedback?.summary}</p>{Object.entries(a.feedback?.criteria||{}).map(([k,c]:any)=><div key={k}><h4>{k}</h4><p>{c.observation}</p><p>{c.drill}</p></div>)}</details>)}</div>}{target&&typeof target==='object'&&<form className="cms-editor" onSubmit={e=>{e.preventDefault();run(async()=>{await api('admin/user',{userId:target.user_id,action,reason,day,kind});setTarget(null);await load();await onSaved();setMessage('Learner action recorded.');})}}><h3>{action}: {target.name}</h3>{action==='override-pass'&&<div className="form-grid">{field('Milestone day',day,v=>setDay(Number(v)),'number')}<label>Type<select value={kind} onChange={e=>setKind(e.target.value)}>{['daily','weekly','revision'].map(t=><option key={t}>{t}</option>)}</select></label></div>}<label>Reason<textarea minLength={8} required value={reason} onChange={e=>setReason(e.target.value)}/></label>{action==='delete-user'&&<p>Deletes this learner’s stored recordings, answers, messages and progress, and blocks this account from re-registering. This cannot be undone.</p>}<button className="button" disabled={busy}>Confirm account action</button><button type="button" onClick={()=>setTarget(null)}>Cancel</button></form>}</section>}
  {tab==='Messages'&&<section className="panel"><h3>Private support inbox</h3>{overview?.messages.map((m:any)=><form className="message-card" key={m.id} onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);run(async()=>{await api('admin/message',{id:m.id,reply:String(f.get('reply')),status:String(f.get('status'))});await load();setMessage('Reply saved to the learner’s private inbox.');})}}><h4>{m.subject}</h4><small>{m.name} · {m.status}</small><p>{m.body}</p><label>Reply<textarea name="reply" defaultValue={m.reply} required/></label><select name="status" defaultValue={m.status}>{['open','answered','closed'].map(v=><option key={v}>{v}</option>)}</select><button className="button" disabled={busy}>Save reply</button></form>)}</section>}
  {tab==='Live Diagnostics'&&<section className="panel"><h3>Production Login, Database & AI Diagnostics</h3>
- <p>These tests use your current verified owner session and the actual deployed Cloudflare D1 and AI services. No API key is displayed or re-entered, and no learner recording is stored.</p>
+ <p>These checks use your verified Google owner session, the real production Cloudflare D1 and real AI provider. Three full-Part AI audio requests may consume API quota. No API key is displayed or re-entered, and no learner recording or score is stored.</p>
  <div className="admin-qa-actions">
-  <button className="button" disabled={busy} onClick={()=>void productionDiagnostics()}>{busy?'Running checks…':'Run production Google session + D1 + AI checks'}</button>
+  <button className="button" disabled={busy} onClick={()=>void productionDiagnostics()}>{busy?'Running checks…':'Run live production checks (uses AI quota)'}</button>
   <button className="button" disabled={busy} onClick={()=>void testMicrophone()}>Test my real microphone (4 seconds)</button>
  </div>
  {liveCheckedAt&&<p className="admin-qa-timestamp">Last test: {liveCheckedAt}</p>}
