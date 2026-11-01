@@ -6,6 +6,7 @@ import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
 import {questions,byId,dailyQuestions,examQuestions,type Question} from '../../lib/questions';
 import {nextStage,streak} from '../../lib/learning';
+import {WEEKLY_PASS_BAND,weeklyGate,cooldownUntil,passedTest} from '../../lib/weekly-policy';
 import {assess} from '../../lib/assessment';
 import {assessSpeakingPart,type PartAnswer} from '../../lib/part-assessment';
 import {transcribeAudio,validAudio,audioMime} from '../../lib/transcription';
@@ -24,19 +25,28 @@ const parse=(s:any,fallback:any=null)=>{try{return JSON.parse(s)}catch{return fa
 async function rows(sql:string,...args:any[]){return (await db().prepare(sql).bind(...args).all()).results as any[];}
 async function execute(sql:string,...args:any[]){return db().prepare(sql).bind(...args).run();}
 async function allQuestions(){const changes=await rows('SELECT * FROM question_overrides');const map=new Map(questions.map(q=>[q.id,q]));for(const c of changes){if(c.archived)map.delete(c.id);else map.set(c.id,parse(c.data));}return [...map.values()];}
+async function activeCooldowns(uid:string){
+ await execute('DELETE FROM question_cooldowns WHERE available_at<=?',now());
+ return rows('SELECT question_id,available_at FROM question_cooldowns WHERE user_id=? AND available_at>?',uid,now());
+}
+async function cleanupOldAudio(){
+ const cutoff=new Date(Date.now()-24*3600000).toISOString();
+ const expired=await rows('SELECT id,audio_key FROM attempts WHERE created_at<? LIMIT 50',cutoff);
+ for(const item of expired){try{if(item.audio_key)await E().BUCKET?.delete(item.audio_key)}catch{}await execute('DELETE FROM attempts WHERE id=?',item.id)}
+}
 async function learningContext(uid:string){const [profiles,days,tests,content]=await Promise.all([rows('SELECT track FROM profiles WHERE user_id=?',uid),rows('SELECT day FROM days WHERE user_id=?',uid),rows('SELECT kind,milestone FROM tests WHERE user_id=?',uid),readContent(db())]);return {content,stage:nextStage(days.map(d=>d.day),tests,profiles[0]?.track||210,content.exams)};}
 async function state(user:any){
  const authProvider=E().AUTH_MODE==='google'?'Google':'ChatGPT';const connection=await connectionStatus(E(),db());const content=await readContent(db());const revisionRow=await rows("SELECT value FROM settings WHERE key='site_content_revision'");const contentRevision=Number(revisionRow[0]?.value||0);
  if(!user)return {authProvider,content,contentRevision,user:null,profile:null,attempts:[],saved:[],completed:[],tests:[],streak:0,stage:{type:'daily',day:1},aiConfigured:connection.configured,connection,storageReady:!!E().DB,audioStorageReady:false,learningStorage:'progress-only',isAdmin:false};
  await execute('INSERT OR IGNORE INTO profiles (user_id,name,track,created_at) VALUES (?,?,?,?)',user.userId,user.displayName,210,now());
- const [profiles,attempts,saved,days,tests]=await Promise.all([rows('SELECT * FROM profiles WHERE user_id=?',user.userId),rows('SELECT * FROM attempts WHERE user_id=? ORDER BY created_at DESC LIMIT 500',user.userId),rows('SELECT * FROM saved WHERE user_id=?',user.userId),rows('SELECT * FROM days WHERE user_id=? ORDER BY day',user.userId),rows('SELECT * FROM tests WHERE user_id=?',user.userId)]);
+ const [profiles,attempts,saved,days,tests,cooldowns]=await Promise.all([rows('SELECT * FROM profiles WHERE user_id=?',user.userId),rows('SELECT * FROM attempts WHERE user_id=? AND created_at>=? ORDER BY created_at DESC LIMIT 100',user.userId,new Date(Date.now()-86400000).toISOString()),rows('SELECT * FROM saved WHERE user_id=?',user.userId),rows('SELECT * FROM days WHERE user_id=? ORDER BY day',user.userId),rows('SELECT * FROM tests WHERE user_id=?',user.userId),activeCooldowns(user.userId)]);
  const complete=days.map(d=>d.day);
- return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
+ return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
 }
 async function handler(req:Request){
  const path=new URL(req.url).pathname.replace(/^\/api\//,'');const user=await getChatGPTUser();
  if(user){const control=(await rows('SELECT status FROM user_access WHERE user_id=?',user.userId))[0];if(control&&control.status!=='active')return fail(control.status==='deleted'?'This account has been removed by the administrator.':'Your account is suspended. Contact the site owner.',403);await execute("INSERT INTO user_access (user_id,email,status,reason,updated_at) VALUES (?,?,'active','',?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email",user.userId,user.email,now());}
- if(req.method==='GET'&&path==='state')return response(await state(user));
+ if(req.method==='GET'&&path==='state'){if(user)await cleanupOldAudio();return response(await state(user))}
  if(!user&&E().AUTH_MODE==='google')return fail('Sign in with Google to access Speak Station.',401);
  if(req.method==='GET'&&path==='content')return response({content:await readContent(db())});
  if(req.method==='GET'&&path==='questions')return response({questions:await allQuestions()});
@@ -117,10 +127,24 @@ async function handler(req:Request){
    assigned=book.questions;
   }else{
    const current=await learningContext(uid);
-   if(current.stage.type!==meta.kind||current.stage.day!==meta.day)return fail('Your learning session is no longer active. Refresh and try again.',409);
-   assigned=meta.kind==='daily'?dailyQuestions(meta.day,bank):stageQuestions(meta.day,meta.kind,bank,current.content,examQuestions);
+   if(meta.kind==='daily'){
+    if(current.stage.type!=='daily'||current.stage.day!==meta.day)return fail('Your daily practice stage is not active.',409);
+    assigned=dailyQuestions(meta.day,bank);
+   }else{
+    const test=current.content.exams.find(e=>e.kind===meta.kind&&e.day===meta.day);
+    if(!test)return fail('This exam does not exist.',404);
+    const previous=await rows('SELECT kind,milestone,answers FROM tests WHERE user_id=?',uid);
+    const gate=weeklyGate(previous,meta.kind,test.number);
+    if(!gate.unlocked)return fail(gate.reason,409);
+    if(previous.some(t=>t.kind===meta.kind&&t.milestone===meta.day&&passedTest(t)))return fail('You have already passed this exam.',409);
+    assigned=stageQuestions(meta.day,meta.kind,bank,current.content,examQuestions);
+   }
   }
   const expected=assigned.filter(q=>q.part===meta.part);
+  if(meta.kind==='free'){
+   const locked=new Set((await activeCooldowns(uid)).map((v:any)=>v.question_id));
+   if(expected.some(q=>locked.has(q.id)))return fail('These practice questions are resting for 15 days. Pick a different book.',409);
+  }
   if(!expected.length||expected.length!==ids.length||expected.some((q,i)=>q.id!==ids[i]))return fail('Complete every question in this part before requesting the AI assessment.',409);
   const answers:PartAnswer[]=[];
   let total=0;
@@ -145,7 +169,11 @@ async function handler(req:Request){
     const receipt=await issueReceipt({id,userId:uid,questionId:item.question.id,kind:meta.kind,day:meta.day,recorded:true,reviewed:true,scores,exp:Date.now()+12*3600000},receiptSecret());
     return {id,questionId:item.question.id,receipt};
    }));
-   return response({part:meta.part,feedback,receipts,assessmentCount:1,source:'gemini',official:false});
+   if(meta.kind==='free'){
+    const availableAt=cooldownUntil(now());
+    for(const item of answers)await execute('INSERT INTO question_cooldowns (user_id,question_id,available_at) VALUES (?,?,?) ON CONFLICT(user_id,question_id) DO UPDATE SET available_at=excluded.available_at',uid,item.question.id,availableAt);
+   }
+   return response({part:meta.part,feedback,receipts,assessmentCount:1,official:false});
   }catch(error){return fail(assessmentFailureMessage(error),502)}
  }
  if(path==='submit'&&req.method==='POST'){
@@ -188,12 +216,36 @@ async function handler(req:Request){
   return response({...result,partScores,bookNumber:b.bookNumber});
  }
  if(req.method==='POST'&&path==='complete-stage'){
-  const body=z.object({receipts:z.array(z.string().max(4000)).max(30)}).parse(await req.json());const s=await learningContext(uid),stage=s.stage;if(stage.type==='complete')return fail('Track already complete.');const activeBank=await allQuestions(),content=s.content;const expected=stage.type==='daily'?dailyQuestions(stage.day,activeBank):stageQuestions(stage.day,stage.type,activeBank,content,examQuestions);
-  const receipts=await Promise.all(body.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed||r.kind!==stage.type||r.day!==stage.day))return fail('Use reviewed audio assessments from your current learning stage.',409);
-  const valid=receipts as PracticeReceipt[];if(valid.length!==expected.length||new Set(valid.map(r=>r.questionId)).size!==expected.length||!expected.every(q=>valid.some(r=>r.questionId===q.id)))return fail('Record, assess and review every assigned answer before completing this stage.',409);
-  const result=summarizeSpeakingParts(valid,expected,content.passBand);if(stage.type!=='daily'&&!result.passed)return fail(result.band===null?'Every test answer needs audio-based criterion estimates before a pass can be awarded.':`Practice band ${result.band.toFixed(1)}/9. The pass threshold is ${content.passBand.toFixed(1)}/9. Review your feedback and try again.`,409);
-  if(stage.type==='daily')await execute('INSERT OR IGNORE INTO days (user_id,day,completed_at) VALUES (?,?,?)',uid,stage.day,now());
-  else await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM tests WHERE user_id=? AND milestone=? AND kind=?)',crypto.randomUUID(),uid,stage.day,stage.type,JSON.stringify({passed:true,practiceBand:result.band,partScores:result.partScores}),now(),uid,stage.day,stage.type);
+  const body=z.object({receipts:z.array(z.string().max(4000)).min(1).max(30)}).parse(await req.json());
+  const receipts=await Promise.all(body.receipts.map(v=>proof(v,uid)));
+  if(receipts.some(r=>!r||!r.recorded||!r.reviewed))return fail('Assess all three speaking parts before completing the exam.',409);
+  const valid=receipts as PracticeReceipt[],kind=valid[0].kind,day=valid[0].day;
+  if(!['daily','weekly','revision'].includes(kind)||valid.some(r=>r.kind!==kind||r.day!==day))return fail('Assessment receipts do not belong to the same session.',409);
+  const context=await learningContext(uid),bank=await allQuestions();
+  let assigned:Question[];
+  if(kind==='daily'){
+   if(context.stage.type!=='daily'||context.stage.day!==day)return fail('This daily stage is not active.',409);
+   assigned=dailyQuestions(day,bank);
+  }else{
+   const exam=context.content.exams.find(t=>t.kind===kind&&t.day===day);
+   if(!exam)return fail('This exam is unavailable.',409);
+   const previous=await rows('SELECT kind,milestone,answers FROM tests WHERE user_id=?',uid);
+   const gate=weeklyGate(previous,kind as 'weekly'|'revision',exam.number);
+   if(!gate.unlocked)return fail(gate.reason,409);
+   if(previous.some(t=>t.kind===kind&&t.milestone===day&&passedTest(t)))return fail('This exam is already passed.',409);
+   assigned=stageQuestions(day,kind,bank,context.content,examQuestions);
+  }
+  if(valid.length!==assigned.length||new Set(valid.map(r=>r.questionId)).size!==assigned.length||!assigned.every(q=>valid.some(r=>r.questionId===q.id)))return fail('All assigned answers must have completed Part assessments.',409);
+  const threshold=kind==='daily'?context.content.passBand:WEEKLY_PASS_BAND;
+  const result=summarizeSpeakingParts(valid,assigned,threshold);
+  const summary={passed:result.passed,practiceBand:result.band,partScores:result.partScores};
+  if(kind==='daily'){
+   await execute('INSERT OR IGNORE INTO days (user_id,day,completed_at) VALUES (?,?,?)',uid,day,now());
+   await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',crypto.randomUUID(),uid,day,'daily-score',JSON.stringify(summary),now());
+  }else{
+   // Failed assessments also keep their part scores, but never unlock the next exam.
+   await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',crypto.randomUUID(),uid,day,kind,JSON.stringify(summary),now());
+  }
   return response({...await state(user),stageResult:result});
  }
  if(req.method==='POST'&&path==='save')return fail('New practice notes and feedback stay in this tab only. Use Download to keep a personal copy.',410);
