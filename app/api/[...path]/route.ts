@@ -1,4 +1,5 @@
 import {issueReceipt,readReceipt,receiptResult,type PracticeReceipt} from '../../lib/practice-receipts';
+import {buildSpeakingBooks} from '../../lib/speaking-books';
 import {readContent,contentSchema,estimatedBand,stageQuestions} from '../../lib/content';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
@@ -113,11 +114,27 @@ async function handler(req:Request){
  }
  if(req.method==='POST'&&path==='message'){const b=z.object({subject:z.string().min(3).max(160),body:z.string().min(10).max(5000)}).parse(await req.json());if(/[\u0980-\u09ff]/.test(b.subject+b.body))return fail('Please write your message in English.');const recent=await rows('SELECT id FROM messages WHERE user_id=? AND created_at>?',uid,new Date(Date.now()-3600000).toISOString());if(recent.length>=5)return fail('You can send up to five support messages per hour.',429);await execute("INSERT INTO messages (id,user_id,subject,body,reply,status,created_at) VALUES (?,?,?,?,'','open',?)",crypto.randomUUID(),uid,b.subject,b.body,now());return response({ok:true});}
  if(req.method==='POST'&&path==='practice-result'){
-  const b=z.object({receipts:z.array(z.string().max(4000)).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20)}).parse(await req.json());
+  const b=z.object({receipts:z.array(z.string().max(4000)).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20),bookNumber:z.number().int().min(1).max(240).optional(),bookMode:z.enum(['practice','exam']).optional()}).parse(await req.json());
   const receipts=await Promise.all(b.receipts.map(v=>proof(v,uid)));if(receipts.some(r=>!r||!r.recorded||!r.reviewed))return fail('Record, assess and review every test answer first.',409);
   const valid=receipts as PracticeReceipt[];if(new Set(b.questionIds).size!==b.questionIds.length||new Set(valid.map(r=>r.questionId)).size!==b.questionIds.length||valid.length!==b.questionIds.length||valid.some(r=>!b.questionIds.includes(r.questionId)))return fail('Each distinct test question needs its own reviewed answer.',409);
   const bank=await allQuestions();if(![1,2,3].every(p=>b.questionIds.some(id=>bank.find(q=>q.id===id)?.part===p)))return fail('A speaking test must include all three parts.',409);
-  return response(receiptResult(valid,(await readContent(db())).passBand));
+  const result=receiptResult(valid,(await readContent(db())).passBand);
+  if(!b.bookNumber)return response(result);
+  const book=buildSpeakingBooks(bank,240)[b.bookNumber-1];
+  if(!book||book.questions.length!==b.questionIds.length||book.questions.some((q,i)=>q.id!==b.questionIds[i]))return fail('This speaking book has changed. Restart with the current question collection.',409);
+  const partScores:Record<number,number|null>={};
+  for(const part of [1,2,3]){
+   const ids=book.questions.filter(q=>q.part===part).map(q=>q.id);
+   const partReceipts=valid.filter(r=>ids.includes(r.questionId));
+   const numbers=partReceipts.flatMap(r=>r.scores);
+   partScores[part]=partReceipts.length!==ids.length||numbers.some(v=>typeof v!=='number'||!Number.isFinite(v))
+    ?null:Math.max(0,Math.min(9,Math.round((numbers as number[]).reduce((a,c)=>a+c,0)/numbers.length*2)/2));
+  }
+  const mode=b.bookMode||'practice';
+  await execute('INSERT INTO tests (id,user_id,milestone,kind,answers,completed_at) VALUES (?,?,?,?,?,?)',
+   crypto.randomUUID(),uid,b.bookNumber,mode==='exam'?'book-exam':'book',
+   JSON.stringify({bookId:book.id,topic:book.topic,practiceBand:result.band,partScores,criteria:result.criteria,passed:result.passed,mode}),now());
+  return response({...result,partScores,bookNumber:b.bookNumber});
  }
  if(req.method==='POST'&&path==='complete-stage'){
   const body=z.object({receipts:z.array(z.string().max(4000)).max(30)}).parse(await req.json());const s=await learningContext(uid),stage=s.stage;if(stage.type==='complete')return fail('Track already complete.');const activeBank=await allQuestions(),content=s.content;const expected=stage.type==='daily'?dailyQuestions(stage.day,activeBank):stageQuestions(stage.day,stage.type,activeBank,content,examQuestions);
