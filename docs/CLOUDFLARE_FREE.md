@@ -52,3 +52,30 @@ Recordings stay in browser memory for playback and are sent transiently to the a
 Workers Free currently allows 100,000 requests per day and 10 ms CPU per request. D1 Free currently includes 5 million rows read per day, 100,000 rows written per day and 5 GB storage. Limits can change; check the official links above. Exceeding a free limit can interrupt service; this setup does not automatically upgrade a plan. The Vinext application must fit Workers Free CPU and bundle limits in your real account. Local build and dry-run checks do not replace that production check.
 
 No deployment to your own Cloudflare account or real Google OAuth sign-in has been performed from this workspace. These require the account-specific configuration and secrets above. Authentication boundary tests use isolated fake credentials.
+
+
+## Cloudflare dashboard: GitHub-based deployment
+
+Open Cloudflare **Workers & Pages → Create application → Import a repository** and choose `EMON-721/Speak-Station`. Under project settings:
+
+- Root path: `/`
+- Build command: `pnpm run build:cloudflare`
+- Deploy command: `pnpm run db:migrate:cloudflare && pnpm run deploy:cloudflare` (the token must be allowed to edit D1 as well as deploy Workers)
+- Turn Preview builds off during initial setup. Leave Cloudflare Access off if the site is meant to be public; Google login still protects the learner/admin workspace.
+- Use a dedicated Speak Station build token with Workers deploy/create permission and D1 edit permission; a token used for another website may not include D1.
+
+In Advanced settings add these **build environment variables**, one at a time:
+
+| Variable name | Value |
+| --- | --- |
+| `SPEAK_D1_DATABASE_ID` | Your new `speak-station-free` D1 database UUID |
+| `SPEAK_APP_ORIGIN` | `https://speak-station.YOUR_ACCOUNT_SUBDOMAIN.workers.dev` with the real account subdomain |
+| `SPEAK_ADMIN_EMAIL` | The owner's verified Google email |
+
+These are build-time inputs. The deployment script validates them and creates an **untracked** `wrangler.cloudflare.generated.jsonc` for Wrangler. You do not need to commit your email address or database ID to GitHub. Alternatively, supply real values in the committed template, but avoid that for public repositories.
+
+The `SPEAK_*` build variables are **not** Worker runtime secrets. Once the Worker exists, set `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `CREDENTIAL_ENCRYPTION_KEY` in **Worker → Settings → Variables & Secrets**, as encrypted secrets. Set Google's authorized OAuth redirect URI to exactly `SPEAK_APP_ORIGIN/callback`. Do not paste API tokens, OAuth client secrets, or encryption keys in the Git repository or chat.
+
+Create the D1 database first from Cloudflare D1 before launching this build. The deploy command above runs all unapplied migrations against the new database before publishing. The configured build token must allow D1 access for this operation, otherwise migration fails safely and prevents a broken deployment. If you use a token that can only deploy Workers, perform the database migration separately with an authorized Wrangler session, then set the deploy command to `pnpm run deploy:cloudflare`.
+
+Cloudflare Workers Builds variables are build-only; configured `vars` and Worker Secrets are provided to the running Worker. Deployment is **not** complete until Google OAuth, Worker Secrets, and the owner-managed Gemini connection have been configured and tested.
