@@ -19,4 +19,10 @@
   // No R2 subscription, paid plan, custom domain purchase or AI billing is enabled here.
   // Add AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
   // CREDENTIAL_ENCRYPTION_KEY as Worker secrets. Never put secrets in this file.
+  // Gemini AI is reused from the encrypted D1 settings record (gemini_connection).
+  // If the original D1 connection is unavailable, the Worker also accepts an
+  // OPTIONAL Secret named GEMINI_API_KEY, entered in the Cloudflare dashboard.
+  // Do not commit API key values. Never replace CREDENTIAL_ENCRYPTION_KEY casually:
+  // doing so makes previously encrypted settings impossible to decrypt.
+  // Normal GitHub deploys do not require entering the Gemini API key again.
 }
