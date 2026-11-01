@@ -277,6 +277,42 @@ async function handler(req:Request){
  }
  if(path.startsWith('admin')){
   if(!admin)return fail('Administrator access is required. The owner must configure the administrator email first.',403);
+  if(req.method==='GET'&&path==='admin/diagnostics'){
+   // Authenticated OWNER ONLY. Uses the actual production binding and Google
+   // session; never returns secrets, user records or account identifiers.
+   const checks:{name:string;status:'pass'|'fail';detail:string}[]=[];
+   const probe=async(name:string,run:()=>Promise<void>)=>{
+    try{await run();checks.push({name,status:'pass',detail:'Verified on this Cloudflare deployment'})}
+    catch{checks.push({name,status:'fail',detail:'Verification failed. Review private Worker logs and applied D1 migrations.'})}
+   };
+   await probe('Owner Google session and authorization',async()=>{
+    if(E().AUTH_MODE!=='google'||!user.userId.startsWith('google:')||!admin)throw Error('NOT_GOOGLE_OWNER');
+   });
+   await probe('Cloudflare D1 database binding',async()=>{await rows('SELECT 1 AS test')});
+   const requiredTables=['profiles','user_access','days','tests','settings','question_cooldowns','question_overrides','messages','audit','usage'];
+   for(const table of requiredTables)await probe('D1 table: '+table,async()=>{
+    // Table names come only from the static list, never user-supplied input.
+    await rows('SELECT * FROM '+table+' LIMIT 0');
+   });
+   await probe('Authenticated learner profile',async()=>{
+    const records=await rows('SELECT user_id FROM profiles WHERE user_id=? LIMIT 1',uid);
+    if(records.length!==1)throw Error('PROFILE_NOT_FOUND');
+   });
+   await probe('Production D1 transactional write and cleanup',async()=>{
+    const id=crypto.randomUUID();
+    const statements=[
+     db().prepare('INSERT INTO audit (id,user_id,action,detail,created_at) VALUES (?,?,?,?,?)').bind(id,uid,'qa.probe','Temporary, non-personal health check',now()),
+     db().prepare('DELETE FROM audit WHERE id=?').bind(id)
+    ];
+    const responses=await db().batch(statements);
+    if(responses.length!==2||!responses.every(r=>r.success))throw Error('WRITE_FAILED');
+    const remaining=await rows('SELECT id FROM audit WHERE id=?',id);
+    if(remaining.length)throw Error('PROBE_CLEANUP_FAILED');
+   });
+   const status=await connectionStatus(E(),db());
+   checks.push({name:'AI credential available',status:status.configured?'pass':'fail',detail:status.configured?'A configured credential is available. Use the real AI checks below to verify model access.':'No usable AI connection is available in this deployment.'});
+   return response({checks,passed:checks.filter(c=>c.status==='pass').length,total:checks.length,verifiedAt:now(),scope:'Live authenticated owner session, production Cloudflare D1 and saved AI configuration. Provider generation and microphone are separate tests.'});
+  }
   if(req.method==='GET'&&path==='admin/questions'){const overrides=await rows('SELECT * FROM question_overrides');const map=new Map(questions.map(q=>[q.id,{...q,archived:false}]));for(const row of overrides){const q=parse(row.data);if(q)map.set(row.id,{...q,archived:!!row.archived});}return response({questions:[...map.values()]});}
   if(req.method==='GET'&&path==='admin/learner'){const target=new URL(req.url).searchParams.get('userId');if(!target||target.length>200)return fail('Choose a learner.');const profile=(await rows('SELECT * FROM profiles WHERE user_id=?',target))[0];if(!profile)return fail('Learner not found.',404);return response({profile,attempts:(await rows('SELECT * FROM attempts WHERE user_id=? ORDER BY created_at DESC LIMIT 100',target)).map(a=>({...a,feedback:parse(a.feedback)})),days:await rows('SELECT * FROM days WHERE user_id=?',target),tests:(await rows('SELECT * FROM tests WHERE user_id=? ORDER BY completed_at DESC',target)).map(t=>({...t,details:parse(t.answers)}))});}
   if(req.method==='GET')return response({administratorEmail:user.email,users:await rows('SELECT p.user_id,p.name,p.target,p.track,p.created_at,a.email,a.status FROM profiles p LEFT JOIN user_access a ON a.user_id=p.user_id'),messages:await rows('SELECT m.*,p.name FROM messages m LEFT JOIN profiles p ON p.user_id=m.user_id ORDER BY m.created_at DESC LIMIT 200'),activity:await rows('SELECT * FROM audit ORDER BY created_at DESC LIMIT 100'),statistics:(await rows('SELECT COUNT(*) AS attempts, SUM(duration) AS seconds FROM attempts'))[0]});
