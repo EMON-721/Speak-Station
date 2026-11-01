@@ -1,4 +1,5 @@
 import {expandedPack} from './expanded-pack';
+import {realWorldPack,freshTopics} from './real-world-pack';
 import {topicPack} from './topic-pack';
 export type Question={id:string;part:number;topic:string;difficulty:string;duration:number;text:string;cue?:string[];objective:string;related:string[]};
 const topics=[
@@ -16,8 +17,8 @@ const technologyQuestion=questions.find(q=>q.id==='P3-17-06');if(technologyQuest
 const weatherTopics=['How have weather patterns affected daily life in your country?','How can local authorities prepare people for extreme weather?','Why is it difficult to predict the weather accurately?','Do younger and older people respond differently to weather warnings?','What are the advantages and limitations of weather forecasts?','How has technology improved weather forecasting?','Why does weather matter to society?','Does everyone have equal access to reliable weather information?','How can communities prepare for severe weather?','What can countries learn from each other about preparing for severe weather?','How does income affect people’s ability to cope with extreme weather?','Should schools teach people how to understand weather warnings?','What responsibilities do individuals have during severe weather?','How does the media report extreme weather?','Can traditional weather knowledge and modern forecasting complement each other?','How would you measure improvements in weather warning systems?','What unintended consequences can responses to weather events have?','Who should decide when a weather warning requires public action?'];
 questions.filter(q=>q.part===3&&q.topic==='Weather').forEach((q,i)=>q.text=weatherTopics[i]);
 questions[0].text='What do you like most about your hometown?';
-questions.push(...topicPack,...expandedPack);
-export const topicNames=topics.map(t=>t[0]);
+questions.push(...topicPack,...expandedPack,...realWorldPack);
+export const topicNames=[...topics.map(t=>t[0]),...freshTopics];
 export const byId=(id:string)=>questions.find(q=>q.id===id);
 export function dailyQuestions(day:number,source:Question[]=questions){const topics=Array.from(new Set(source.map(q=>q.topic))).filter(t=>[1,2,3].every(p=>source.some(q=>q.topic===t&&q.part===p)));if(!topics.length)throw new Error('Add at least one complete speaking topic.');const topic=topics[(day-1)%topics.length],cycle=Math.floor((day-1)/topics.length);const pool=(part:number)=>source.filter(q=>q.part===part&&q.topic===topic);const a=pool(1),b=pool(2),c=pool(3);if(!a.length||!b.length||!c.length)throw new Error('Every assigned topic needs all three speaking parts.');return [...Array.from({length:4},(_,i)=>a[(cycle*4+i)%a.length]),b[cycle%b.length],...Array.from({length:3},(_,i)=>c[(cycle*3+i)%c.length])];}
 export function examQuestions(day:number,source:Question[]=questions){const d=dailyQuestions(day,source);return [d[0],d[1],d[2],d[3],d[4],d[5],d[6],d[7]];}

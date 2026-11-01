@@ -41,3 +41,7 @@ Isolated API tests exercise the actual route handler with SQLite/object-store ad
 - Signed-out users cannot access the protected question endpoints; the new prominent AI warning says that speech recognition, comments and scores may be wrong, and are not official IELTS results.
 - Template theme updated to charcoal and copper (no blue/green brand colors), with a matching warm waveform favicon. Admin-stored theme settings may still override some dynamic content; the site uses the new book UI outside CMS-managed sections.
 - Existing daily lessons, weekly/revision progression, original question bank and account data remain available. Detailed audio/transcripts still follow current tab-only data retention policy. This is not a 7-day cloud recording archive.
+
+## New real-world speaking topics
+
+Added 20 distinct cross-part themes with 8 Part 1 prompts, 3 cue-card prompts, and 8 Part 3 discussions each (380 new prompts). Themes range from digital payments and public speaking to craft skills, consumer reviews, repair and community spaces. Together with the pre-existing library, the new pack gives the 240-book generator more varied subjects. As always, these are author-created IELTS-style prompts, not official IELTS exam questions.
