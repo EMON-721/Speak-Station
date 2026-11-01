@@ -51,6 +51,12 @@ export default function Workspace(){
  const transcriptSession=useRef(0),transcribePromise=useRef<Promise<void>|null>(null),transcribeAbort=useRef<AbortController|null>(null),cloudTimer=useRef<any>(null),recognitionTimer=useRef<any>(null),capture=useRef<Awaited<ReturnType<typeof captureTranscriptAudio>>>(null),cloudSeen=useRef(false),interimRef=useRef('');
  const volatile=useRef<{owner:string;attempts:any[];saved:any[]|null}>({owner:'',attempts:[],saved:null});
  const [practiceResult,setPracticeResult]=useState<any>(null);const [replaceAiConnection,setReplaceAiConnection]=useState(false);const sessionAttempts=useRef<Record<string,string>>({});
+ type SpokenDraft={audio:Blob;transcript:string;duration:number};
+ const [draftAnswers,setDraftAnswers]=useState<Record<string,SpokenDraft>>({});
+ const draftAnswersRef=useRef<Record<string,SpokenDraft>>({});
+ const [partReports,setPartReports]=useState<Record<number,any>>({});
+ const partReceipts=useRef<Record<string,string>>({});
+ function clearPartSession(){draftAnswersRef.current={};setDraftAnswers({});partReceipts.current={};setPartReports({});}
  const [bookQuery,setBookQuery]=useState(''),[bookPage,setBookPage]=useState(0),[activeBook,setActiveBook]=useState<SpeakingBook|null>(null),[bookMode,setBookMode]=useState<'practice'|'exam'>('practice');
  const [allTopics,setAllTopics]=useState(false),[layoutEditor,setLayoutEditor]=useState(false),[layoutSelection,setLayoutSelection]=useState<any>(null),[layoutText,setLayoutText]=useState('');
  const content:SiteContent=data.content||defaultContent;
@@ -76,7 +82,7 @@ export default function Workspace(){
  const name=(data.profile?.name||data.user?.name||'').split(' ')[0];
  const minutes=Math.floor(data.attempts.reduce((n:number,a:any)=>n+a.duration,0)/60);
  const activeList=session?.list||[selected];
- const answered=(id:string)=>data.attempts.some((a:any)=>a.question_id===id&&a.kind===session?.kind&&a.day===session?.day&&a.status==='evaluated'&&a.reviewed&&a.receipt);
+ const answered=(id:string)=>!!draftAnswers[id];
  const completedCount=session?session.list.filter(q=>answered(q.id)).length:0;
  const validCurrent=!!feedback&&!feedback.sample&&!!attemptId;
  const filtered=bank.filter(q=>(part==='all'||q.part===Number(part))&&(topic==='all'||q.topic===topic)&&(difficulty==='all'||q.difficulty===difficulty)&&(!onlySaved||bookmarks.some((b:any)=>b.key===q.id))&&`${q.text} ${q.topic}`.toLowerCase().includes(search.toLowerCase()));
@@ -87,7 +93,7 @@ export default function Workspace(){
   if(!matching){notify('No complete book is available for this topic.');return}
   openBook(matching,'practice');
  }
- function startSession(kind='daily'){if(recording)return;setActiveBook(null);sessionAttempts.current={};setPracticeResult(null);const stage=data.stage;if(kind==='daily'&&stage.type!=='daily'){notify(`Complete your ${stage.type} assessment before your next day.`);navigate('examiner');return}if((kind==='weekly'||kind==='revision')&&stage.type!==kind){notify('Complete the required learning days first.');return}const list=kind==='daily'?dailyQuestions(stage.day,bank):stageQuestions(stage.day,kind,bank,content,examQuestions);setSession({kind,day:stage.day,list});setQindex(0);reset(list[0]);navigate('practice');if(kind!=='daily'&&list[0].part===2)setPrep(60)}
+ function startSession(kind='daily'){if(recording)return;clearPartSession();setActiveBook(null);sessionAttempts.current={};setPracticeResult(null);const stage=data.stage;if(kind==='daily'&&stage.type!=='daily'){notify(`Complete your ${stage.type} assessment before your next day.`);navigate('examiner');return}if((kind==='weekly'||kind==='revision')&&stage.type!==kind){notify('Complete the required learning days first.');return}const list=kind==='daily'?dailyQuestions(stage.day,bank):stageQuestions(stage.day,kind,bank,content,examQuestions);setSession({kind,day:stage.day,list});setQindex(0);reset(list[0]);navigate('practice');if(kind!=='daily'&&list[0].part===2)setPrep(60)}
  function rememberAttempt(attempt:any){volatile.current.owner=data.user?.id||'';volatile.current.attempts=[attempt,...volatile.current.attempts.filter(a=>a.id!==attempt.id)];setData((current:any)=>({...current,attempts:[attempt,...current.attempts.filter((a:any)=>a.id!==attempt.id)]}));}
  async function save(type:string,key:string,value:any,reviewed=false,remove=false){const existing=volatile.current.saved??data.saved;const next=existing.filter((s:any)=>s.type!==type||s.key!==key);if(!remove)next.push({type,key,data:value,reviewed});volatile.current.owner=data.user?.id||'';volatile.current.saved=next;setData((current:any)=>({...current,saved:next}));notify(remove?'Removed from this tab.':reviewed?'Reviewed in this tab.':'Kept in this tab only. Download a copy before leaving.');}
  function bookmark(q:Question){save('bookmark',q.id,q,false,bookmarks.some((b:any)=>b.key===q.id))}
@@ -132,7 +138,51 @@ export default function Workspace(){
  }
  function stopRecording(){recordingRef.current=false;setRecording(false);setPaused(false);pausedRef.current=false;clearInterval(timer.current);clearInterval(cloudTimer.current);clearTimeout(recognitionTimer.current);recognition.current?.stop();if(!cloudSeen.current&&interimRef.current){original.current=[original.current,interimRef.current].filter(Boolean).join(' ');setTranscript(original.current);setInterim('');interimRef.current='';}if(recorder.current&&recorder.current.state!=='inactive')recorder.current.stop()}
  function pauseRecording(){if(!recorder.current)return;if(paused){recorder.current.resume();pausedRef.current=false;setPaused(false);try{recognition.current?.start()}catch{}}else{recorder.current.pause();pausedRef.current=true;setPaused(true);clearTimeout(recognitionTimer.current);recognition.current?.stop()}}
- async function submit(){if(!audio&&typedAnswer.trim().length<15){notify('Record your answer, or enter a transcript for text-only feedback.');return}if(!data.user){setModal('signin');return}if(!data.aiConfigured){if(data.isAdmin)setModal('integration');else notify('Speaking feedback is temporarily unavailable. Please contact the administrator.');return}if(audio&&elapsed<3){notify('Record at least 3 seconds.');return}cancelTranscription();setBusy(true);setFeedback(null);setAssessmentError('');try{const f=new FormData();if(audio)f.append('audio',audio,'answer.'+(audio.type.includes('mp4')?'mp4':'webm'));f.append('questionId',selected.id);f.append('duration',String(elapsed));f.append('transcript',original.current);f.append('typed',typedAnswer);f.append('kind',audio?(session?.kind||'free'):'free');f.append('day',String(audio?(session?.day||0):0));const result=await api('submit',f);setAttemptId(result.id);sessionAttempts.current[selected.id]=result.id;const text=result.feedback.transcript||original.current||typedAnswer;rememberAttempt({id:result.id,receipt:result.receipt,question_id:selected.id,kind:audio?(session?.kind||'free'):'free',day:audio?(session?.day||0):0,status:'evaluated',duration:audio?elapsed:0,mime:audio?audio.type:'text/plain',audio_key:'',transcript:text,feedback:result.feedback,reviewed:0,created_at:new Date().toISOString(),temporary:true});setFeedback(result.feedback);setFeedbackTab('overview');original.current=text;setTranscript(text);setInterim('');setSegments([]);setSpeechStatus('Assessment transcript ready. Kept in this tab only.');notify(result.textOnly?'Text feedback is ready. Pronunciation needs a recording.':'Assessment ready. Your audio and feedback were not saved permanently.');}catch(e){setAssessmentError((e as Error).message);notify((e as Error).message)}finally{setBusy(false)}}
+ async function submit(){await saveQuestionAndContinue()}
+ async function saveQuestionAndContinue(){
+  if(!session||recording||busy)return;
+  if(!audio||elapsed<3){notify('Record at least 3 seconds for every speaking question.');return}
+  const currentPart=selected.part;
+  if(partReports[currentPart]){notify('This part has already been assessed. Continue to the next part.');return}
+  const nextDraft:SpokenDraft={audio,transcript:original.current||transcript||'',duration:elapsed};
+  const nextAnswers={...draftAnswersRef.current,[selected.id]:nextDraft};
+  draftAnswersRef.current=nextAnswers;setDraftAnswers(nextAnswers);
+  const group=session.list.filter(q=>q.part===currentPart);
+  const last=group[group.length-1]?.id===selected.id;
+  if(!last){
+   const next=qindex+1;
+   setQindex(next);reset(session.list[next]);
+   notify('Answer recorded in this tab. AI assessment runs after the last Part '+currentPart+' question.');
+  }else await assessCompletedPart(currentPart,nextAnswers);
+ }
+ async function assessCompletedPart(part:number,source=draftAnswersRef.current){
+  if(!session||busy||recording)return;
+  const group=session.list.filter(q=>q.part===part);
+  if(!group.length||group.some(q=>!source[q.id]?.audio)){notify('Complete every recorded answer in Part '+part+'.');return}
+  if(!data.user){setModal('signin');return}
+  if(!data.aiConfigured){if(data.isAdmin)setModal('integration');else notify('AI connection is not available. Contact the site owner.');return}
+  const form=new FormData();
+  form.append('meta',JSON.stringify({kind:session.kind,day:session.day,part,
+   ...(activeBook?{bookNumber:activeBook.number}:{}),
+   answers:group.map(q=>({questionId:q.id,transcript:source[q.id].transcript,duration:source[q.id].duration}))}));
+  for(const [i,q] of group.entries()){
+   const item=source[q.id];
+   form.append('audio_'+i,item.audio,'part-'+part+'-answer-'+i+(item.audio.type.includes('mp4')?'.mp4':'.webm'));
+  }
+  setBusy(true);setAssessmentError('');
+  try{
+   const report=await api('assess-part',form);
+   if(report.part!==part||!report.feedback||report.receipts?.length!==group.length)throw new Error('Incomplete part assessment from server.');
+   for(const value of report.receipts)partReceipts.current[value.questionId]=value.receipt;
+   setPartReports(current=>({...current,[part]:report}));
+   setFeedback(report.feedback);setFeedbackTab('overview');
+   setTranscript(report.feedback.transcript||group.map(q=>source[q.id].transcript).join('\n'));
+   setInterim('');
+   notify('Complete Part '+part+' assessment ready. Read your feedback before continuing.');
+  }catch(e){setAssessmentError((e as Error).message);notify((e as Error).message)}
+  finally{setBusy(false)}
+ }
+
  useEffect(()=>{if(feedback||assessmentError){const frame=requestAnimationFrame(()=>document.getElementById('feedback-report')?.scrollIntoView({behavior:'smooth',block:'start'}));return()=>cancelAnimationFrame(frame);}},[feedback,assessmentError]);
  async function connectAI(){if(!integrationKey.trim()){setConnectionMessage('Paste your Google AI Studio key in the secure field.');return}setConnectionBusy(true);setConnectionMessage('Checking your Gemini connection…');try{const result=await api('integration',{key:integrationKey.trim()});setIntegrationKey('');await refresh();setConnectionMessage('Connected successfully. Model: '+result.model+'. Record an answer to test your personal feedback.')}catch(e){setIntegrationKey('');setConnectionMessage((e as Error).message)}finally{setConnectionBusy(false)}}
  async function testAudioConnection(){setConnectionBusy(true);setConnectionMessage('Transcribing a short synthetic voice sample. This does not create a learning attempt…');try{const sample=await fetch('/transcription-check.wav');if(!sample.ok)throw new Error('The audio test sample could not load.');const f=new FormData();f.append('audio',new Blob([await sample.arrayBuffer()],{type:'audio/wav'}),'transcription-check.wav');f.append('language','auto');const result=await api('transcribe',f);if(!result.transcript?.trim())throw new Error('No speech was detected in the audio test. Please retry.');setConnectionMessage('Audio transcription test passed. Recognised words: '+(result.transcript||'[no speech detected]'));}catch(e){setConnectionMessage((e as Error).message);}finally{setConnectionBusy(false);}}
@@ -140,7 +190,7 @@ export default function Workspace(){
 
  function openBook(book:SpeakingBook,mode:'practice'|'exam'='practice'){
   if(recording||busy)return;
-  sessionAttempts.current={};setPracticeResult(null);setActiveBook(book);setBookMode(mode);setExamMode(mode);
+  clearPartSession();sessionAttempts.current={};setPracticeResult(null);setActiveBook(book);setBookMode(mode);setExamMode(mode);
   setSession({kind:'free',day:book.number,list:book.questions});
   setQindex(0);reset(book.questions[0]);navigate('practice');
  }
@@ -166,8 +216,36 @@ export default function Workspace(){
  }
 
  async function reviewAttempt(){const attempt=data.attempts.find((a:any)=>a.id===attemptId);if(!attempt?.receipt){notify('Record this answer again to use the current progress-only assessment.');return}try{const result=await api('review-attempt',{receipt:attempt.receipt});rememberAttempt({...attempt,receipt:result.receipt,reviewed:1});notify('Feedback reviewed. You can continue to the next question.')}catch(e){notify((e as Error).message)}}
- const sessionReceipts=()=>session?.list.map(q=>data.attempts.find((a:any)=>a.id===sessionAttempts.current[q.id])?.receipt).filter(Boolean)||[];
- async function nextQuestion(){if(!session)return;const next=qindex+1;if(next<session.list.length){setQindex(next);reset(session.list[next]);if(session.kind!=='daily'&&session.list[next].part===2)setPrep(60)}else if(session.kind==='free'){setBusy(true);try{setPracticeResult(await api('practice-result',{receipts:sessionReceipts(),questionIds:session.list.map(q=>q.id),...(activeBook?{bookNumber:activeBook.number,bookMode}: {})}));if(activeBook)await refresh();setModal('free-complete');}catch(e){notify((e as Error).message)}finally{setBusy(false)}}else completeStage()}
+ const sessionReceipts=()=>session?.list.map(q=>partReceipts.current[q.id]).filter(Boolean)||[];
+ async function nextQuestion(){
+  if(!session||busy||recording)return;
+  const part=session.list[qindex].part;
+  const group=session.list.filter(q=>q.part===part);
+  const lastId=group[group.length-1]?.id;
+  if(!partReports[part]){
+   if(!answered(session.list[qindex].id)){notify('Record this answer before moving on.');return}
+   if(session.list[qindex].id===lastId)await assessCompletedPart(part);
+   else{const index=qindex+1;setQindex(index);reset(session.list[index])}
+   return;
+  }
+  const next=qindex+1;
+  if(next<session.list.length){
+   setQindex(next);reset(session.list[next]);
+   if(session.list[next].part===2)setPrep(60);
+   return;
+  }
+  if(![1,2,3].every(p=>partReports[p])){notify('Assess all three parts before requesting the final result.');return}
+  if(session.kind==='free'){
+   setBusy(true);
+   try{
+    setPracticeResult(await api('practice-result',{receipts:sessionReceipts(),questionIds:session.list.map(q=>q.id),...(activeBook?{bookNumber:activeBook.number,bookMode}: {})}));
+    if(activeBook)await refresh();
+    setModal('free-complete');
+   }catch(e){setAssessmentError((e as Error).message);notify((e as Error).message)}
+   finally{setBusy(false)}
+  }else await completeStage();
+ }
+
  async function completeStage(){try{const next=await api('complete-stage',{receipts:sessionReceipts()});setData({...next,attempts:[...volatile.current.attempts,...next.attempts],saved:volatile.current.saved??next.saved});setModal('complete')}catch(e){notify((e as Error).message)}}
  function showSample(){if(recording){notify('Finish your recording before opening sample feedback.');return}const book=books.find(b=>b.questions.some(q=>q.id===initialQuestions[0].id))||books[0];if(book){setActiveBook(book);setBookMode('practice');setSession({kind:'free',day:book.number,list:book.questions});setQindex(Math.max(0,book.questions.findIndex(q=>q.id===initialQuestions[0].id)))}reset(initialQuestions[0]);setFeedback(sampleFeedback);setFeedbackTab('overview');setAttemptId('');setTranscript('I am living in Dhaka since five years. I like my hometown because it is very good. There are many things. I like it.');original.current='';setSelected(initialQuestions[0]);navigate('practice');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('feedback-report')?.scrollIntoView({behavior:'smooth'})))}
  async function loadAttempt(a:any){if(recording)return;const q=bank.find(q=>q.id===a.question_id)||initialQuestions[0];const book=books.find(b=>b.questions.some(item=>item.id===q.id))||books.find(b=>b.topic===q.topic)||books[0];if(book){setActiveBook(book);setBookMode('practice');setSession({kind:'free',day:book.number,list:book.questions});setQindex(Math.max(0,book.questions.findIndex(item=>item.id===q.id)))}reset(q);setAttemptId(a.id);setTranscript(a.transcript.replace(/[\u0980-\u09ff]+(?:[ \t]+[\u0980-\u09ff]+)*/g,'[non-English speech]'));original.current=a.transcript;setElapsed(a.duration);setAudioUrl(a.audio_key?`/api/audio/${a.id}`:'');setFeedback(a.feedback);setFeedbackTab('overview');navigate('practice')}
