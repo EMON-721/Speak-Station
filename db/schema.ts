@@ -12,3 +12,5 @@ export const userAccess=sqliteTable('user_access',{userId:text('user_id').primar
 export const messages=sqliteTable('messages',{id:text('id').primaryKey(),userId:text('user_id').notNull(),subject:text('subject').notNull(),body:text('body').notNull(),reply:text('reply').notNull().default(''),status:text('status').notNull().default('open'),createdAt:text('created_at').notNull()});
 
 export const questionCooldowns=sqliteTable('question_cooldowns',{userId:text('user_id').notNull(),questionId:text('question_id').notNull(),availableAt:text('available_at').notNull()},t=>[primaryKey({columns:[t.userId,t.questionId]})]);
+
+export const studySessions=sqliteTable('study_sessions',{id:text('id').primaryKey(),userId:text('user_id').notNull(),category:text('category').notNull(),kind:text('kind').notNull(),day:integer('day').notNull(),mode:text('mode').notNull(),startedAt:text('started_at').notNull(),expiresAt:text('expires_at').notNull(),completedAt:text('completed_at')});
