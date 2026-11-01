@@ -264,6 +264,7 @@ html[data-theme=dark] .homepage-shell{--accent-ink:#9dbdf9;--surface:#282f3a;--s
     animation: station-spark-drift 9s ease-in-out -3s infinite;
   }
   .homepage-shell .hero-art:hover *,
+  .homepage-shell .hero-art:hover .orb-wave i,
   .homepage-shell .hero:focus-within .hero-art * {
     animation-play-state: paused;
   }
