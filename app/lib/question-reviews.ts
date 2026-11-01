@@ -6,7 +6,7 @@ export type PartQuestionReview={
  correctedAnswer:string|null;
  improvedAnswer:string|null;
  comment:string|null;
- corrections:{original:string;corrected:string;explanation:string}[];
+ corrections:{original:string;corrected:string;explanation:string;category:string}[];
 };
 type ExpectedQuestion={question:{id:string;text:string};transcript:string};
 const asText=(value:unknown,max=6000):string=>typeof value==='string'?value.trim().slice(0,max):'';
@@ -30,7 +30,7 @@ export function normalizePartQuestionReviews(raw:unknown,expected:ExpectedQuesti
    if(!item||typeof item!=='object'||Array.isArray(item))return [];
    const value=item as Record<string,unknown>;
    const original=asText(value.original,1200),corrected=asText(value.corrected,1200),explanation=asText(value.explanation,2000);
-   return original&&corrected?[{original,corrected,explanation}]:[];
+   return original&&corrected?[{original,corrected,explanation,category:asText(value.category,80)||'Grammar / expression'}]:[];
   }):[];
   return {
    questionId:question.id,questionText:question.text,
