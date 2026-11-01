@@ -33,8 +33,9 @@ async function state(user:any){
 async function handler(req:Request){
  const path=new URL(req.url).pathname.replace(/^\/api\//,'');const user=await getChatGPTUser();
  if(user){const control=(await rows('SELECT status FROM user_access WHERE user_id=?',user.userId))[0];if(control&&control.status!=='active')return fail(control.status==='deleted'?'This account has been removed by the administrator.':'Your account is suspended. Contact the site owner.',403);await execute("INSERT INTO user_access (user_id,email,status,reason,updated_at) VALUES (?,?,'active','',?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email",user.userId,user.email,now());}
- if(req.method==='GET'&&path==='content')return response({content:await readContent(db())});
  if(req.method==='GET'&&path==='state')return response(await state(user));
+ if(!user&&E().AUTH_MODE==='google')return fail('Sign in with Google to access Speak Station.',401);
+ if(req.method==='GET'&&path==='content')return response({content:await readContent(db())});
  if(req.method==='GET'&&path==='questions')return response({questions:await allQuestions()});
  if(req.method==='POST'&&path==='content-batch'){
   // Service-only updates rely on the dispatch access boundary of this owner-private Site.
@@ -129,8 +130,8 @@ async function handler(req:Request){
  }
  if(req.method==='POST'&&path==='save')return fail('New practice notes and feedback stay in this tab only. Use Download to keep a personal copy.',410);
  if(req.method==='POST'&&path==='profile'){
-  const p=z.object({name:z.string().min(1).max(100),target:z.enum(['5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0']),track:z.union([z.literal(90),z.literal(120),z.literal(180),z.literal(210)]),examDate:z.string().max(10)}).parse(await req.json());
-  await execute('UPDATE profiles SET name=?,target=?,track=?,exam_date=? WHERE user_id=?',p.name,p.target,p.track,p.examDate,uid);return response({ok:true});
+  const p=z.object({name:z.string().min(1).max(100),phone:z.string().trim().max(25).refine(v=>v===''||/^\+?[0-9][0-9 -]{6,23}$/.test(v),'Enter a valid phone number.').optional().default(''),target:z.enum(['5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0']),track:z.union([z.literal(90),z.literal(120),z.literal(180),z.literal(210)]),examDate:z.string().max(10)}).parse(await req.json());
+  await execute('UPDATE profiles SET name=?,phone=?,target=?,track=?,exam_date=? WHERE user_id=?',p.name,p.phone,p.target,p.track,p.examDate,uid);return response({ok:true});
  }
  if(req.method==='POST'&&path==='delete-attempt'){
   const {id}=z.object({id:z.string().uuid()}).parse(await req.json());const a=(await rows('SELECT * FROM attempts WHERE id=? AND user_id=?',id,uid))[0];if(!a)return fail('Recording not found.',404);if(a.audio_key)await E().BUCKET?.delete(a.audio_key);await execute('DELETE FROM attempts WHERE id=? AND user_id=?',id,uid);return response({ok:true});
