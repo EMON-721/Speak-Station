@@ -492,3 +492,16 @@ body{background:#111214;color:#F2F3F5}
  .homepage-shell .home-jumps{grid-template-columns:1fr}
  .homepage-shell .book-part-tabs button{padding:7px;font-size:11px}
 }
+
+/* Finished-part transcript and feedback archive inside the active session */
+.homepage-shell .completed-part-reviews{margin:20px 0 24px;padding:19px;border:1px solid #41454d;border-radius:15px;background:#202226;scroll-margin-top:115px}
+.homepage-shell .completed-part-reviews>h3{font-size:18px;color:#f1f2f4}
+.homepage-shell .completed-part-reviews>p{font-size:12px;color:#b9bdc5;margin:8px 0 16px}
+.homepage-shell .completed-part-reviews details{border:1px solid #3e424a;border-radius:10px;background:#282a2f;margin:10px 0;scroll-margin-top:110px}
+.homepage-shell .completed-part-reviews summary{display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;padding:13px 15px;color:#eef0f3}
+.homepage-shell .completed-part-reviews summary span{color:#e2e4e9;font-weight:700}
+.homepage-shell .completed-part-content{padding:5px 16px 18px;border-top:1px solid #3d4048;max-height:450px;overflow-y:auto}
+.homepage-shell .completed-part-content h4{color:#f1f2f4;margin:15px 0 7px}
+.homepage-shell .completed-part-content p{color:#c5c9d0;line-height:1.7;font-size:13px;overflow-wrap:anywhere}
+.homepage-shell .completed-part-content>div{border-bottom:1px solid #3e424a;padding:8px 0}
+.homepage-shell .completed-part-content small{color:#b5bac1}
