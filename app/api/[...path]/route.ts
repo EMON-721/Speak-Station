@@ -106,7 +106,7 @@ async function handler(req:Request){
 
  if(path==='assess-part'&&req.method==='POST'){
   const config=await aiConfiguration(E(),db());
-  if(!config.GEMINI_API_KEY)return fail('No usable Gemini connection was found in this Cloudflare environment. Ask the owner to test the existing API connection.',503);
+  if(!config.GEMINI_API_KEY)return fail('AI assessment is temporarily unavailable. Please contact the website administrator.',503);
   const form=await req.formData();
   let meta:any;
   try{meta=z.object({
