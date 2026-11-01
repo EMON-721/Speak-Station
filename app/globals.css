@@ -591,3 +591,56 @@ body{background:#111214;color:#F2F3F5}
 @media(max-width:1220px){.homepage-shell .studio-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.homepage-shell .session-side-panel{position:static;max-height:none;grid-column:1/-1}.homepage-shell .side-question-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.homepage-shell .studio-grid{grid-template-columns:1fr}.homepage-shell .session-side-panel{grid-column:auto}.homepage-shell .sample-mock-parts{grid-template-columns:1fr}.homepage-shell .score-history-summary{grid-template-columns:1fr}.homepage-shell .lightweight-review{flex-direction:column;align-items:flex-start}.homepage-shell .home-header-label{display:none}}
 @media(max-width:480px){.homepage-shell .side-question-list{grid-template-columns:1fr}.homepage-shell .score-history-row,.homepage-shell .score-history-head{padding:12px}}
+
+
+/* Restore the full learner Progress Dashboard while keeping recording data temporary. */
+.homepage-shell .progress-dashboard-highlights{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:20px 0}
+.homepage-shell .progress-dashboard-highlight{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0;padding:20px;background:#202226;border:1px solid #3c4149;border-radius:13px}
+.homepage-shell .progress-dashboard-highlight svg{color:#d9dce2}
+.homepage-shell .progress-dashboard-highlight strong{font-size:26px;line-height:1.2;color:#f2f3f5}
+.homepage-shell .progress-dashboard-highlight span{font-size:12px;color:#c3c6cf;overflow-wrap:anywhere}
+.homepage-shell .progress-dashboard-grid{display:grid;grid-template-columns:1.08fr 1fr;gap:16px;margin:20px 0}
+.homepage-shell .progress-dashboard-grid>.panel,.homepage-shell .progress-timeline-panel,.homepage-shell .progress-achievements-panel,.homepage-shell .progress-score-panel{min-width:0;background:#202226;border:1px solid #3c4149;border-radius:14px;padding:20px;margin:18px 0}
+.homepage-shell .progress-dashboard-grid>.panel{margin:0}
+.homepage-shell .progress-dashboard-grid h3,.homepage-shell .progress-timeline-panel h3,.homepage-shell .progress-achievements-panel h3,.homepage-shell .progress-score-panel h3{font-size:18px;color:#eff1f4;margin:0 0 13px}
+.homepage-shell .progress-dashboard-grid .bar-chart{min-height:190px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;padding:20px 5px 0}
+.homepage-shell .progress-dashboard-grid .chart-column{display:flex;align-items:center;flex:1;flex-direction:column;gap:8px;min-width:0;height:195px;color:#dfe2e7;font-size:11px}
+.homepage-shell .progress-dashboard-grid .chart-column>.bar-track{position:relative;display:flex;align-items:flex-end;flex:1;width:min(100%,41px);min-height:130px;background:#33363d;border-radius:7px;overflow:hidden}
+.homepage-shell .progress-dashboard-grid .chart-column>.bar-track>div{width:100%;min-height:0;background:linear-gradient(180deg,#e4e6ea,#9299a6);border-radius:7px 7px 0 0;transition:height .25s}
+.homepage-shell .progress-dashboard-grid .chart-column label{font-size:11px;color:#bfc4ce}
+.homepage-shell .progress-dashboard-grid small{color:#aeb5be;font-size:11px;line-height:1.65}
+.homepage-shell .progress-error-panel .category-progress{margin:13px 0}
+.homepage-shell .progress-error-panel .category-progress>div{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#cdd1d8;margin-bottom:6px}
+.homepage-shell .progress-error-panel .category-progress strong{font-size:11px;color:#d9dce3;font-weight:600;white-space:nowrap}
+.homepage-shell .progress-error-panel .category-progress progress{width:100%;height:7px;appearance:none;border-radius:7px;overflow:hidden}
+.homepage-shell .progress-error-panel .category-progress progress::-webkit-progress-bar{background:#353942}
+.homepage-shell .progress-error-panel .category-progress progress::-webkit-progress-value{background:#c6c9d0;border-radius:7px}
+.homepage-shell .progress-error-panel .category-progress progress::-moz-progress-bar{background:#c6c9d0}
+.homepage-shell .progress-context{font-size:12px;line-height:1.65;color:#b8bfc8;margin:0 0 16px}
+.homepage-shell .progress-timeline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-height:430px;overflow-y:auto}
+.homepage-shell .progress-timeline-item{display:grid;grid-template-columns:100px minmax(0,1fr);gap:5px 12px;min-width:0;background:#292c32;border:1px solid #3e434b;padding:13px;border-radius:10px}
+.homepage-shell .progress-timeline-item>span{font-size:12px;color:#c1c7cf}
+.homepage-shell .progress-timeline-item>strong{font-size:13px;font-weight:600;color:#f1f2f4;overflow-wrap:anywhere}
+.homepage-shell .progress-timeline-item>small{grid-column:2;font-size:11px;color:#adb6c0}
+.homepage-shell .progress-achievements-panel .achievement-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.homepage-shell .progress-achievements-panel .achievement{display:flex;align-items:center;text-align:center;flex-direction:column;justify-content:center;min-width:0;min-height:135px;padding:16px;background:#272a30;border:1px solid #40454d;border-radius:11px;gap:8px}
+.homepage-shell .progress-achievements-panel .achievement.earned{border-color:#b4bbc5;background:#33373e}
+.homepage-shell .progress-achievements-panel .achievement svg{color:#cdd3db}
+.homepage-shell .progress-achievements-panel .achievement strong{font-size:12px;color:#f1f3f5}
+.homepage-shell .progress-achievements-panel .achievement span{font-size:11px;color:#bfc4cc}
+.homepage-shell .progress-score-panel .score-history-table{margin-top:12px}
+.homepage-shell .compact-guidelines{margin:30px 0 18px;background:#1d1f23;border:1px solid #3d424a;border-radius:15px;padding:19px}
+.homepage-shell .compact-guidelines-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.homepage-shell .compact-guidelines-heading h2{font-size:18px;font-weight:700;color:#eff1f3}
+.homepage-shell .compact-guidelines-heading p{font-size:12px;color:#bfc4cc;line-height:1.55;margin-top:5px}
+.homepage-shell .compact-guidelines-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.homepage-shell .compact-guidelines-list details{min-width:0;background:#26292f;border:1px solid #424750;border-radius:10px;padding:12px 14px}
+.homepage-shell .compact-guidelines-list summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
+.homepage-shell .compact-guidelines-list summary::-webkit-details-marker{display:none}
+.homepage-shell .compact-guidelines-list summary span{color:#b8bdc7;font-size:11px}
+.homepage-shell .compact-guidelines-list summary strong{min-width:0;flex:1;font-size:12px;line-height:1.5;color:#f1f2f4}
+.homepage-shell .compact-guidelines-list details[open] summary svg{transform:rotate(180deg)}
+.homepage-shell .compact-guidelines-list details p{color:#cbd0d8;font-size:12px;line-height:1.7;margin:13px 0 0}
+.homepage-shell .compact-guideline-action{padding-top:10px;border-top:1px solid #42464e}
+@media(max-width:1100px){.homepage-shell .progress-dashboard-grid{grid-template-columns:1fr}.homepage-shell .progress-achievements-panel .achievement-grid,.homepage-shell .progress-dashboard-highlights{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.homepage-shell .progress-timeline{grid-template-columns:1fr}.homepage-shell .compact-guidelines-list{grid-template-columns:1fr}.homepage-shell .progress-dashboard-highlight{padding:14px}.homepage-shell .progress-dashboard-highlight strong{font-size:23px}}
