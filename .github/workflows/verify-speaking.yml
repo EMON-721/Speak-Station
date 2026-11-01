@@ -25,5 +25,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
+      - name: Speaking-book and part-level assessment tests
+        run: node scripts/tests/verify-speaking-parts.mjs
       - name: Cloudflare production build (no secrets)
         run: pnpm run build:cloudflare
