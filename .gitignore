@@ -43,3 +43,6 @@ yarn-error.log*
 
 # OS metadata
 .DS_Store
+
+# Cloudflare CI generated account-specific deploy config
+/wrangler.cloudflare.generated.jsonc
