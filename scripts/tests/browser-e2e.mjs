@@ -43,6 +43,7 @@ await page.addInitScript(()=>{
 await page.route('**/api/**',async route=>{
  const req=route.request(),path=new URL(req.url()).pathname;
  if(path==='/api/state')return reply(route,fakeState());
+ if((path.startsWith('/api/admin/')||path==='/api/content-batch')&&!adminMode)return reply(route,{error:'Administrator access is required.'},403);
  if(path==='/api/begin-session'){scheduledBegins++;return reply(route,{sessionId:'00000000-0000-4000-8000-000000000001',startedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString(),resumed:false,scheduling:eligibleSchedule})}
  if(path==='/api/questions')return reply(route,{questions});
  if(path==='/api/content')return reply(route,{content:defaultContent});
@@ -90,6 +91,19 @@ try{
   await page.locator('#home').waitFor({state:'visible',timeout:30000});
   await page.locator('.profile-trigger').waitFor();
   assert(await page.getByText('Speak Station',{exact:true}).count()>0);
+ });
+ await verify('Normal Google learner never sees owner controls and cannot call admin API',async()=>{
+  assert.equal(await page.locator('.owner-bar').count(),0,'owner bar is absent from normal learner DOM');
+  assert.equal(await page.getByRole('button',{name:'Open admin workspace'}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Edit page layout'}).count(),0);
+  assert.equal(await page.locator('.admin-console').count(),0);
+  for(const path of ['/api/admin/diagnostics','/api/admin/questions','/api/admin/overview']){
+   const status=await page.evaluate(async p=>(await fetch(p)).status,path);
+   assert.equal(status,403,'regular learner cannot read '+path);
+  }
+  const status=await page.evaluate(async()=> (await fetch('/api/content-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status);
+  assert.equal(status,403,'regular learner cannot mutate CMS');
+  await capture('regular-learner-no-owner-toolbar');
  });
  await verify('Dashboard, achievements and dated progress',async()=>{
   assert(await page.locator('#progress .progress-dashboard-highlight').count()>=4);
@@ -207,6 +221,14 @@ try{
   assert.equal(await page.locator('.admin-qa-pass').count(),9);
   await capture('owner-diagnostics-simulated');
   adminMode=false;
+ });
+ await verify('Admin UI disappears completely after switching to normal user session',async()=>{
+  await page.goto(ORIGIN,{waitUntil:'domcontentloaded'});
+  await page.locator('#home').waitFor({state:'visible'});
+  assert.equal(await page.locator('.owner-bar').count(),0);
+  assert.equal(await page.getByRole('button',{name:'Open admin workspace'}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Edit page layout'}).count(),0);
+  await capture('normal-member-after-owner');
  });
 
  assert(scheduledBegins>=2,'All practice launches must reserve a server-issued session');

@@ -42,6 +42,8 @@ jobs:
         run: python3 scripts/tests/verify-d1-migrations.py
       - name: Google OAuth and protected identity security tests
         run: node scripts/tests/verify-google-oauth.mjs
+      - name: Enforce verified Google owner-only admin access
+        run: node scripts/tests/verify-owner-access.mjs
       - name: AI assessment integration simulations for Parts 1, 2 and 3
         run: node scripts/tests/verify-ai-assessment.mjs
       - name: Cloudflare production build (no secrets)

@@ -4,6 +4,7 @@ import {buildSpeakingBooks} from '../../lib/speaking-books';
 import {readContent,contentSchema,estimatedBand,stageQuestions} from '../../lib/content';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
+import {isVerifiedGoogleOwner} from '../../lib/owner-access';
 import {questions,byId,dailyQuestions,examQuestions,type Question} from '../../lib/questions';
 import {nextStage,streak} from '../../lib/learning';
 import {WEEKLY_PASS_BAND,weeklyGate,cooldownUntil,passedTest} from '../../lib/weekly-policy';
@@ -89,7 +90,7 @@ async function state(user:any){
  await execute('INSERT OR IGNORE INTO profiles (user_id,name,track,created_at) VALUES (?,?,?,?)',user.userId,user.displayName,210,now());
  const [profiles,attempts,saved,days,tests,cooldowns]=await Promise.all([rows('SELECT * FROM profiles WHERE user_id=?',user.userId),rows('SELECT * FROM attempts WHERE user_id=? AND created_at>=? ORDER BY created_at DESC LIMIT 100',user.userId,new Date(Date.now()-86400000).toISOString()),rows('SELECT * FROM saved WHERE user_id=?',user.userId),rows('SELECT * FROM days WHERE user_id=? ORDER BY day',user.userId),rows('SELECT * FROM tests WHERE user_id=?',user.userId),activeCooldowns(user.userId)]);
  const complete=days.map(d=>d.day);
- return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email,memberNumber:(await rows('SELECT member_number FROM member_numbers WHERE user_id=?',user.userId))[0]?.member_number??null},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,activityDays:days.map(d=>({day:d.day,completedAt:d.completed_at})),tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,scheduling:await studyQuota(user.userId),weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase()};
+ return {authProvider,content,contentRevision,messages:await rows('SELECT id,subject,body,reply,status,created_at FROM messages WHERE user_id=? ORDER BY created_at DESC LIMIT 50',user.userId),user:{id:user.userId,name:user.displayName,email:user.email,memberNumber:(await rows('SELECT member_number FROM member_numbers WHERE user_id=?',user.userId))[0]?.member_number??null},profile:profiles[0],attempts:attempts.map(a=>({...a,feedback:parse(a.feedback)})),saved:saved.map(s=>({...s,data:parse(s.data)})),completed:complete,activityDays:days.map(d=>({day:d.day,completedAt:d.completed_at})),tests,streak:streak(days.map(a=>a.completed_at)),stage:nextStage(complete,tests,profiles[0].track,content.exams),cooldowns,scheduling:await studyQuota(user.userId),weeklyPassBand:WEEKLY_PASS_BAND,aiConfigured:connection.configured,connection,storageReady:true,audioStorageReady:false,learningStorage:'progress-only',isAdmin:isVerifiedGoogleOwner(user,E())};
 }
 async function handler(req:Request){
  const path=new URL(req.url).pathname.replace(/^\/api\//,'');const user=await getChatGPTUser();
@@ -99,11 +100,10 @@ async function handler(req:Request){
  if(req.method==='GET'&&path==='content')return response({content:await readContent(db())});
  if(req.method==='GET'&&path==='questions')return response({questions:await allQuestions()});
  if(req.method==='POST'&&path==='content-batch'){
-  // Service-only updates rely on the dispatch access boundary of this owner-private Site.
-  // Disable CONTENT_UPDATES_ALLOWED before changing this Site's audience.
+  // Only the verified Google owner may change CMS content, even if a service flag is set.
+  if(!isVerifiedGoogleOwner(user,E()))return fail('Owner access is required.',403);
   if(E().CONTENT_UPDATES_ALLOWED!=='owner_private')return fail('Content updates are disabled.',403);
-  if(user&&req.headers.get('origin')!==new URL(req.url).origin)return fail('Content edits must start from this website.',403);
-  if(user&&(!E().ADMIN_EMAIL||user.email.toLowerCase()!==E().ADMIN_EMAIL.toLowerCase()))return fail('Owner access is required.',403);
+  if(req.headers.get('origin')!==new URL(req.url).origin)return fail('Content edits must start from this website.',403);
   if(Number(req.headers.get('content-length')||0)>256000)return fail('Content batch is too large.',413);
   const schema=z.object({questions:z.array(z.object({id:z.string().regex(/^ADD-\d{4}-\d{2}-\d{2}-P[123]-\d{2}$/),text:z.string().min(15).max(1000),part:z.number().int().min(1).max(3),topic:z.string().min(1).max(80),difficulty:z.string().max(40),duration:z.number().int().min(15).max(180),objective:z.string().max(500),cue:z.array(z.string().max(200)).max(5).optional(),related:z.array(z.string()).max(5)})).min(1).max(60)});
   const batch=schema.parse(await req.json());const bank=await allQuestions();const known=new Set(bank.map(q=>q.text.toLowerCase()));let added=0;
@@ -112,7 +112,7 @@ async function handler(req:Request){
  }
  if(!user)return fail('Sign in to save your learning progress.',401);
  const uid=user.userId;
- const admin=!!E().ADMIN_EMAIL&&user.email.toLowerCase()===E().ADMIN_EMAIL.toLowerCase();
+ const admin=isVerifiedGoogleOwner(user,E());
  if(req.method!=='GET'){
   const origin=req.headers.get('origin');if(!origin||new URL(origin).origin!==new URL(req.url).origin)return fail('This action must start from Speak Station.',403);
   const length=Number(req.headers.get('content-length')||0);if(length>(path==='assess-part'?17:9)*1024*1024)return fail(path==='assess-part'?'Combined part audio must be smaller than 17 MB.':'Audio files must be smaller than 8 MB.',413);

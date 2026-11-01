@@ -47,3 +47,14 @@ assert(api.includes('INSERT OR IGNORE INTO member_numbers'),'member number assig
 assert(api.includes('member_number FROM member_numbers WHERE user_id=?'),'member number lookup is user-scoped');
 assert(api.includes("started_at>?)<3"),'D1 enforces three practices in a rolling day');
 console.log('PASS: numbered private profiles and server-side three-practice limit');
+
+// Admin visibility is also a security boundary: a regular learner must not
+// enter the editor through UI navigation, modal state, or any admin API.
+assert(ui.includes("data.isAdmin&&<div className=\"owner-bar\""),'owner-only toolbar must not render to ordinary members');
+assert(ui.includes("if(v==='admin'&&!data.isAdmin)return"),'non-owner cannot navigate to admin view');
+assert(ui.includes("view==='admin'&&data.isAdmin"),'admin dashboard must not mount for regular members');
+assert(ui.includes("modal==='layout'&&data.isAdmin"),'layout editor must not mount for regular members');
+assert(api.includes('isVerifiedGoogleOwner(user,E())'),'backend verifies Google owner from trusted session');
+assert(api.includes("if(!admin)return fail('Administrator access"),'admin endpoints deny non-owner');
+assert(api.includes("if(!isVerifiedGoogleOwner(user,E()))return fail('Owner access"),'CMS batch cannot be changed by a normal user or unauthenticated request');
+console.log('PASS: owner-only controls and CMS/API routes remain isolated from regular learners');
