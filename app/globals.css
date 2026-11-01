@@ -644,3 +644,23 @@ body{background:#111214;color:#F2F3F5}
 .homepage-shell .compact-guideline-action{padding-top:10px;border-top:1px solid #42464e}
 @media(max-width:1100px){.homepage-shell .progress-dashboard-grid{grid-template-columns:1fr}.homepage-shell .progress-achievements-panel .achievement-grid,.homepage-shell .progress-dashboard-highlights{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.homepage-shell .progress-timeline{grid-template-columns:1fr}.homepage-shell .compact-guidelines-list{grid-template-columns:1fr}.homepage-shell .progress-dashboard-highlight{padding:14px}.homepage-shell .progress-dashboard-highlight strong{font-size:23px}}
+
+
+/* 390px/mobile QA: keep header actions within viewport and scroll wide score data locally. */
+.homepage-shell .progress-score-panel{min-width:0;max-width:100%;overflow:hidden}
+.homepage-shell .progress-score-panel .score-history-table{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+.homepage-shell .score-history-head,.homepage-shell .score-history-row{box-sizing:border-box}
+@media(max-width:600px){
+  .homepage-shell .home-topbar{box-sizing:border-box;width:100%;max-width:100vw;min-width:0;gap:8px;padding:0 12px}
+  .homepage-shell .home-topbar .brand{min-width:0;flex:1 1 auto;max-width:calc(100% - 106px);font-size:18px;gap:7px;white-space:nowrap}
+  .homepage-shell .home-topbar .brand>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .homepage-shell .home-topbar .brand small{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .homepage-shell .home-topbar .brand-icon{flex:0 0 32px;width:32px;height:34px}
+  .homepage-shell .home-topbar .header-actions{flex:0 0 auto;min-width:0;gap:7px}
+  .homepage-shell .home-topbar .profile-trigger{flex:0 0 35px;width:35px;min-width:35px;max-width:35px;padding:4px;justify-content:center}
+  .homepage-shell .home-topbar .profile-trigger-text,
+  .homepage-shell .home-topbar .profile-trigger>svg:last-child{display:none}
+  .homepage-shell .home-topbar .profile-trigger .avatar{display:grid;width:28px;height:28px}
+  .homepage-shell .main-content{box-sizing:border-box;min-width:0;max-width:100%}
+  .homepage-shell .home-section{min-width:0;max-width:100%}
+}
