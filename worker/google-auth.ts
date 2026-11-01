@@ -40,7 +40,7 @@ export async function standaloneIdentity(request:Request,env:any,standaloneBuild
    oauthStage='session_signing';
    const session=await signAuth({sub:profile.sub,email:profile.email,name:typeof profile.name==='string'?profile.name:profile.email,exp:Date.now()+7*86400000},secret);
    return redirect(origin+safeReturn(pending.returnTo),[setCookie('__Host-speak-session',session,7*86400),setCookie('__Host-speak-oauth','',0)]);
-  }catch(error){if(!(error instanceof Error&&['TOKEN_EXCHANGE_FAILED','PROFILE_FAILED'].includes(error.message)))console.error('GOOGLE_OAUTH_FAILURE',JSON.stringify({stage:oauthStage,reason:'unexpected_failure'}));return new Response('Google sign-in could not finish. Please start again.',{status:502,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':setCookie('__Host-speak-oauth','',0)}});}
+  }catch(error){if(!(error instanceof Error&&['TOKEN_EXCHANGE_FAILED','PROFILE_FAILED'].includes(error.message)))console.error('GOOGLE_OAUTH_FAILURE',JSON.stringify({stage:oauthStage,reason:'unexpected_failure',errorType:error instanceof Error&&['TypeError','TimeoutError','AbortError','SyntaxError','InvalidStateError'].includes(error.name)?error.name:'OtherError'}));return new Response('Google sign-in could not finish. Please start again.',{status:502,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':setCookie('__Host-speak-oauth','',0)}});}
  }
  const session=configured?await verifyAuth(cookie(request,'__Host-speak-session'),secret):null;
  if(session&&typeof session.sub==='string'&&typeof session.email==='string'){
