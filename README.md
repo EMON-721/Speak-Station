@@ -187,3 +187,12 @@ The verification workflow checks TypeScript, speaking-book and progression tests
 ### Member numbers
 
 Each Google user receives a permanent numeric joining number, visible beside their own name in Profile and the profile header. Existing members are ordered by available profile creation time during the migration, and new numbers are assigned atomically on authenticated requests. Numbers are never reassigned or reused. These display numbers do not replace private Google account identifiers.
+
+<!-- DEPLOYMENT LINKS: maintained for GitHub repository navigation -->
+## Website & repository links
+
+- **Source repository:** https://github.com/EMON-721/Speak-Station
+- **Published website URL:** https://speak-station.emon721.workers.dev
+- **Availability:** Deployment URL recorded; live HTTP reachability could not be independently verified on 1 November 2026.
+
+<!-- END DEPLOYMENT LINKS -->
