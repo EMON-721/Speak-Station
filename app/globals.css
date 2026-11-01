@@ -538,3 +538,56 @@ body{background:#111214;color:#F2F3F5}
 .completed-part-reviews .question-answer-card{background:#202227}
 .completed-part-reviews .question-answer-cards.compact .question-answer-card{padding:16px}
 @media(max-width:720px){.question-answer-pair{grid-template-columns:1fr}.question-answer-card{padding:15px}.question-answer-title{gap:10px;flex-wrap:wrap}.question-answer-title h3{font-size:15px!important}.question-answer-number{font-size:11px}}
+
+/* 2026 professional three-column assessment workspace and streamlined exam cards */
+.homepage-shell .studio-grid{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,1fr) minmax(265px,.69fr);gap:16px;align-items:start}
+.homepage-shell .studio-grid>.question-card,.homepage-shell .studio-grid>.transcript-card{min-width:0}
+.homepage-shell .session-side-panel{position:sticky;top:105px;min-width:0;max-height:calc(100vh - 120px);overflow-y:auto;background:#1d1f23;border:1px solid #393d45;border-radius:14px;padding:17px}
+.homepage-shell .side-panel-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:15px}
+.homepage-shell .side-panel-heading h3{font-size:16px;color:#f3f4f6}
+.homepage-shell .side-panel-heading span{font-size:11px;color:#bec2cb}
+.homepage-shell .side-question-list{display:flex;flex-direction:column;gap:9px}
+.homepage-shell .side-question-list button{display:grid;grid-template-columns:23px minmax(0,1fr);gap:5px 9px;text-align:left;width:100%;border:1px solid #3b3f46;background:#25272c;padding:11px;border-radius:10px;color:#e5e7eb}
+.homepage-shell .side-question-list button.current{border-color:#d6d9df;background:#35383f}
+.homepage-shell .side-question-list button:disabled:not(.current){opacity:.78;cursor:default}
+.homepage-shell .side-question-count{background:#454951;border-radius:50%;display:grid;place-items:center;width:23px;height:23px;font-size:11px}
+.homepage-shell .side-question-text{line-height:1.45;font-size:12px;overflow-wrap:anywhere}
+.homepage-shell .side-question-state{grid-column:2;font-size:10px;color:#c4c8d0}
+.homepage-shell .side-feedback{border-top:1px solid #42464e;margin-top:18px;padding-top:17px}
+.homepage-shell .side-feedback h4{font-size:14px;color:#f1f2f4;margin-bottom:8px}
+.homepage-shell .side-feedback p{font-size:12px;line-height:1.65;color:#bfc3cb;margin:8px 0}
+.homepage-shell .side-feedback strong{display:block;margin:12px 0;color:#eef0f2}
+.homepage-shell .side-feedback .button{width:100%;padding:10px 9px;font-size:12px}
+.homepage-shell .book-active-overview{padding:19px}
+.homepage-shell .book-active-overview .book-part-tabs{margin-bottom:0}
+.homepage-shell .sample-mock-preview{display:block}
+.homepage-shell .sample-mock-preview>div{width:100%}
+.homepage-shell .sample-mock-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.homepage-shell .sample-mock-parts>div{background:#292c31;border:1px solid #41464f;padding:15px;border-radius:11px}
+.homepage-shell .sample-mock-parts b{display:block;color:#f0f1f3;font-size:13px}
+.homepage-shell .sample-mock-parts span{display:block;color:#bfc4cc;margin:8px 0;font-size:11px;line-height:1.4}
+.homepage-shell .sample-mock-parts p{font-size:12px;color:#e1e3e8;font-style:italic;line-height:1.65}
+.homepage-shell .sample-mock-preview small{font-size:11px;color:#b8bdc4}
+.homepage-shell .exam-set.exam-locked{opacity:.70}
+.homepage-shell .exam-set .weekly-score-line{display:block;color:#dde0e5;font-size:12px;margin:12px 0}
+.homepage-shell .exam-set .button:disabled{cursor:not-allowed}
+.homepage-shell .score-history-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.homepage-shell .score-history-summary>div{background:#202227;padding:20px;border:1px solid #393d45;border-radius:12px}
+.homepage-shell .score-history-summary span{display:block;font-size:12px;color:#bfc3ca}
+.homepage-shell .score-history-summary strong{font-size:29px;color:#f2f3f4}
+.homepage-shell .score-history-table{overflow-x:auto;border:1px solid #393d45;border-radius:12px;background:#202226}
+.homepage-shell .score-history-head,.homepage-shell .score-history-row{display:grid;grid-template-columns:minmax(145px,2fr) repeat(4,minmax(60px,.75fr)) minmax(80px,1fr);gap:9px;align-items:center;min-width:660px;padding:13px 16px}
+.homepage-shell .score-history-head{background:#2c3036;color:#d7dae0;font-size:12px;font-weight:700}
+.homepage-shell .score-history-row{border-top:1px solid #393d45;font-size:12px;color:#cbd0d7}
+.homepage-shell .score-history-row strong{color:#f0f1f4}
+.homepage-shell .no-score-history{padding:22px;color:#bcc1c9}
+.homepage-shell .privacy-minimal-note{display:flex;gap:8px;align-items:flex-start;margin-top:15px;color:#c1c5ce;font-size:12px;line-height:1.55}
+.homepage-shell .lightweight-review{display:flex;align-items:center;justify-content:space-between;gap:15px;border:1px solid #3c4048;background:#202227;border-radius:14px;padding:25px}
+.homepage-shell .lightweight-review h2{font-size:20px;color:#f0f1f2}
+.homepage-shell .lightweight-review p{font-size:13px;line-height:1.65;color:#bec2cb;max-width:760px;margin-top:8px}
+.homepage-shell .current-speaking-topic{display:inline-flex;font-size:12px;font-weight:600;letter-spacing:.02em;color:#d8dce2;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.homepage-shell .home-footer{border-color:#3c4047;color:#c9cdd4}
+.homepage-shell .home-footer span,.homepage-shell .home-footer p{color:#c9cdd4;font-size:12px}
+@media(max-width:1220px){.homepage-shell .studio-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.homepage-shell .session-side-panel{position:static;max-height:none;grid-column:1/-1}.homepage-shell .side-question-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.homepage-shell .studio-grid{grid-template-columns:1fr}.homepage-shell .session-side-panel{grid-column:auto}.homepage-shell .sample-mock-parts{grid-template-columns:1fr}.homepage-shell .score-history-summary{grid-template-columns:1fr}.homepage-shell .lightweight-review{flex-direction:column;align-items:flex-start}.homepage-shell .home-header-label{display:none}}
+@media(max-width:480px){.homepage-shell .side-question-list{grid-template-columns:1fr}.homepage-shell .score-history-row,.homepage-shell .score-history-head{padding:12px}}
