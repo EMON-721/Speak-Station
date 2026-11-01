@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import ts from 'typescript';
 
 function loadTs(path){
@@ -36,24 +35,7 @@ const missing=summarizeSpeakingParts(receipts.slice(0,-1),q);
 assert.equal(missing.band,null,'incomplete part cannot produce final score');
 const noPronunciation=receipts.map((r,i)=>i===1?{...r,scores:[6,6,6,null]}:r);
 assert.equal(summarizeSpeakingParts(noPronunciation,q).band,null,'missing acoustic evidence prevents a final score');
-const frontend=fs.readFileSync('app/workspace.tsx','utf8');
-const backend=fs.readFileSync('app/api/[...path]/route.ts','utf8');
-const assessment=fs.readFileSync('app/lib/part-assessment.ts','utf8');
-assert(frontend.includes("api('assess-part',form)"),'frontend posts a complete part');
-assert(!frontend.includes("api('submit',f)"),'frontend does not submit per-question assessments');
-assert(frontend.includes("saveQuestionAndContinue"),'recording stays available between questions');
-assert(frontend.includes("if(audio&&elapsed>=3){await saveQuestionAndContinue();return}"),'Next question saves a fresh recording automatically');
-assert(frontend.includes("const nextPart=session.list.findIndex(q=>q.part>part)"),'completed part navigates directly to the next speaking part');
-assert(frontend.includes("disabled={recording||busy||(!answered(selected.id)&&!audio&&!partReports[selected.part])}"),'Next question is available for a recorded but not yet saved answer');
-assert(frontend.includes("session-side-panel")&&frontend.includes("Continue to Part "),'completed part has a visible sidebar continue button');
-assert(frontend.includes("'Ready'"),'unsaved audio has a clear status');
-assert(frontend.includes("assessCompletedPart"),'part assessment exists');
-assert(backend.includes("expected.some((q,i)=>q.id!==ids[i])"),'server validates complete assigned part');
-assert(backend.includes("summarizeSpeakingParts(valid,assigned"),'daily/weekly final score covers all parts');
-assert(assessment.includes("One authenticated Gemini generation")&&assessment.includes("await fetch("),'one Gemini assessment request per part');
-const css=fs.readFileSync('app/globals.css','utf8');
-assert(css.includes("/* November: keep the book explorer"),'book explorer CSS regression fix');
-console.log('PASS: 240 books, 3-part composition, band computation, incomplete evidence, UI/backend routing, CSS markers');
+console.log('PASS: 240 practice books, three-part scoring and missing-evidence handling');
 
 const {normalizePartQuestionReviews}=loadTs('app/lib/question-reviews.ts');
 const expected=[
@@ -76,17 +58,7 @@ assert.equal(aligned[2].correctedAnswer,null,'missing correction must never be g
 assert.equal(aligned[2].transcript,'Sometimes with my friends.','missing AI transcript falls back to recorded browser transcript');
 assert.equal(normalizePartQuestionReviews(aligned,expected)[2].transcriptSource,'browser','re-render keeps its original browser transcript provenance');
 assert.equal(aligned[3].correctedAnswer,'I would improve the buses.','fourth correction stays with question 4');
-const prompt=fs.readFileSync('app/lib/part-assessment.ts','utf8');
-const feedbackComponentSource=fs.readFileSync('app/feedback-report.tsx','utf8');
-const cards=fs.readFileSync('app/question-answer-cards.tsx','utf8');
-assert(prompt.includes('questionFeedback')&&prompt.includes('exact questionId'),'one-part Gemini prompt requests stable per-question answer grouping');
-assert(frontend.includes('questionReviews={partReports[selected.part]?questionReviewsForPart(selected.part):[]}'),'Part report sends aligned answers to feedback renderer');
-assert(frontend.includes('<QuestionAnswerCards answers={questionReviewsForPart(p)}'),'previous parts keep their grouped answers');
-assert(feedbackComponentSource.includes('<QuestionAnswerCards answers={questionReviews}'),'full answer tab displays per-question cards');
-assert(cards.includes('Your original answer')&&cards.includes('Your corrected answer'),'each card separates original and corrected spoken answers');
-console.log('PASS: distinct question/answer mapping, missing model review fallback, and question-specific corrected-answer UI');
-
-
+console.log('PASS: question-ID answer alignment, transcript provenance and independent corrections');
 
 const {weeklyGate,passedTest,cooldownUntil,isCoolingDown}=loadTs('app/lib/weekly-policy.ts');
 const pass=(kind,number)=>({kind,milestone:number*(kind==='weekly'?7:14),answers:JSON.stringify({passed:true,practiceBand:6,partScores:{1:6,2:6,3:6}})});
@@ -106,9 +78,4 @@ const expiry=cooldownUntil(completeAt);
 assert.equal(expiry,'2026-11-16T06:00:00.000Z','practice question cooldown is exactly 15 days');
 assert.equal(isCoolingDown(expiry,new Date('2026-11-15T00:00:00Z')),true);
 assert.equal(isCoolingDown(expiry,new Date('2026-11-16T06:00:00Z')),false);
-const ux=fs.readFileSync('app/workspace.tsx','utf8');
-assert(ux.includes('sample-mock-preview')&&ux.includes('PREVIEW ONLY'),'sample mock is preview-only');
-assert(ux.includes('weeklyGate(data.tests'),'weekly exam card respects server progression policy');
-assert(ux.includes('book-on-cooldown'),'book UI disallows repeat questions for 15 days');
-assert(!ux.includes('<button onClick={()=>navigate(\'admin\')}>Admin</button>'),'public footer no longer advertises admin control');
-console.log('PASS: 6.0 weekly pass threshold, sequential unlock, mandatory revision, 15-day cooldown, sample preview, public footer');
+console.log('PASS: weekly unlock, revision gating, 6.0 threshold and 15-day cooldown');

@@ -5,6 +5,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  # The newest commit supersedes verification on the same branch.
+  # This prevents noisy failure alerts from obsolete, overlapping runs.
+  group: verify-speaking-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
