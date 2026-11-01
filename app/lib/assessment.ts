@@ -33,7 +33,11 @@ export async function assess(env:any,q:Question,transcript:string,audio:ArrayBuf
   const res=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:JSON.stringify({model:env.AI_MODEL||'gpt-4.1-mini',store:false,instructions:system,input:`${prompt}\nIndependent audio transcription: ${text}\nNo audio supplied to assessment model. Do not assess pronunciation or acoustic fluency.`,text:{format:{type:'json_object'}},max_output_tokens:10000}),signal:AbortSignal.timeout(90000)});
   if(!res.ok)throw await providerFailure(res,provider==='gemini'?'Gemini':'OpenAI');const json:any=await res.json();raw=json.output?.flatMap((v:any)=>v.content||[]).filter((v:any)=>v.type==='output_text').map((v:any)=>v.text).join('')||'';
  }
- const feedback=feedbackSchema.parse(JSON.parse(raw.replace(/^```json\s*|\s*```$/g,'')));
+ const decoded=JSON.parse(raw.replace(/^```json\s*|\s*```$/g,''));
+ // Text input cannot substantiate acoustic criteria. Set these truthfully before
+ // validation, since providers may omit non-applicable fields or return null.
+ if(!audio||provider!=='gemini')decoded.criteria={...decoded.criteria,pronunciation:{score:null,evidence:[],drill:'Record an English answer so pronunciation can be reviewed.',observation:'Not assessed: the language feedback model received a transcript, not audio.'},fluency:{score:null,evidence:[],drill:'Record a sustained answer and practise linking complete thoughts.',observation:'Idea organization can be reviewed from the transcript. Pauses, speed and acoustic fluency require audio analysis.'}};
+ const feedback=feedbackSchema.parse(decoded);
  // New personal details belong only in the separately labelled developed version.
  feedback.correctedAnswer=feedback.correctedAnswer.replace(/\s*\[([^\]]*)\]/g,(match,label)=>/^(unclear|inaudible|non-English speech)$/i.test(label)?match:'').replace(/[ \t]+([,.!?;:])/g,'$1').trim();
  for(const c of Object.values(feedback.criteria))if(c.score!==null)c.score=c.evidence.length?Math.round(c.score*2)/2:null;
