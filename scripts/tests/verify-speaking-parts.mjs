@@ -74,6 +74,7 @@ assert.equal(aligned[0].correctedAnswer,'I live near the city.','first correctio
 assert.equal(aligned[1].correctedAnswer,'I like the parks.','second correction stays with question 2');
 assert.equal(aligned[2].correctedAnswer,null,'missing correction must never be guessed or borrowed');
 assert.equal(aligned[2].transcript,'Sometimes with my friends.','missing AI transcript falls back to recorded browser transcript');
+assert.equal(normalizePartQuestionReviews(aligned,expected)[2].transcriptSource,'browser','re-render keeps its original browser transcript provenance');
 assert.equal(aligned[3].correctedAnswer,'I would improve the buses.','fourth correction stays with question 4');
 const prompt=fs.readFileSync('app/lib/part-assessment.ts','utf8');
 const feedbackComponentSource=fs.readFileSync('app/feedback-report.tsx','utf8');
