@@ -117,3 +117,12 @@ Official references:
 - https://developers.cloudflare.com/workers/configuration/secrets/
 - https://developers.google.com/identity/protocols/oauth2/web-server
 - https://developers.google.com/identity/verification/authentication-policy-compliance
+
+## Build variables save করার পর temporary page দেখালে
+
+Cloudflare-এর Build variables Save করলে চলমান Worker নিজে থেকে বদলায় না। GitHub `main` branch থেকে নতুন production deployment চালিয়ে Deployments-এর সর্বশেষ build log দেখতে হবে। পুরোনো `Ready` deployment বা আগের temporary page success মানেই full app activate হয়নি। এই guide আপডেটটি new build trigger করার জন্যও ব্যবহার করা হয়েছে।
+
+- Log-এ `SETUP PENDING` দেখালে build তিনটি `SPEAK_*` variable পায়নি; Builds → Variables and secrets-এ এগুলো Production environment-এ আছে কি না দেখুন।
+- `D1` migration failure হলে build API token-এর D1 permissions পরীক্ষা করুন।
+- Build complete হলেও deploy failed হলে শেষ 20–30 log lines দিয়ে diagnose করুন।
+- Deploy `Ready` হওয়ার পরে browser-এ Ctrl+Shift+R দিয়ে আবার দেখুন।
