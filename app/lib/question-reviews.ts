@@ -35,7 +35,7 @@ export function normalizePartQuestionReviews(raw:unknown,expected:ExpectedQuesti
   return {
    questionId:question.id,questionText:question.text,
    transcript:audioTranscript||browserTranscript,
-   transcriptSource:audioTranscript?'audio':browserTranscript?'browser':'unavailable',
+   transcriptSource:audioTranscript?(found?.transcriptSource==='browser'?'browser':'audio'):browserTranscript?'browser':'unavailable',
    correctedAnswer:asText(found?.correctedAnswer)||null,
    improvedAnswer:asText(found?.improvedAnswer)||null,
    comment:asText(found?.comment,1800)||null,
