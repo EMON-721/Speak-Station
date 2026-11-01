@@ -272,29 +272,7 @@ async function handler(req:Request){
    return response({part:meta.part,feedback,receipts,assessmentCount:1,official:false});
   }catch(error){return fail(assessmentFailureMessage(error),502)}
  }
- if(path==='submit'&&req.method==='POST'){
-  // Deprecated individual-question submissions cannot bypass complete-session quotas.
-  return fail('Start a complete, scheduled speaking practice or test session instead.',410);
-  const config=await aiConfiguration(E(),db());if(!(config.OPENAI_API_KEY||config.GEMINI_API_KEY))return fail('Connect Google AI Studio in AI connection first. Your recording stays on this device.',503);
-  const f=await req.formData();const bank=await allQuestions();const q=bank.find(q=>q.id===String(f.get('questionId')));if(!q)return fail('Question not found.',404);
-  const audio=f.get('audio');const typed=String(f.get('typed')||'').slice(0,20000);const transcript=String(f.get('transcript')||'').slice(0,20000);const duration=Math.round(Number(f.get('duration')||0));const kind=String(f.get('kind')||'free'),day=Number(f.get('day')||0);const hasAudio=audio instanceof File;
-  if(!['free','daily','weekly','revision'].includes(kind))return fail('Invalid practice type.');
-  if(hasAudio){if(audio.size<500||audio.size>8*1024*1024||!/^audio\/(webm|ogg|mp4|wav|mpeg)/.test(audio.type))return fail('Use an audio file of up to 8 MB.');if(!Number.isFinite(duration)||duration<3||duration>900)return fail('Record at least 3 seconds.');}
-  else if(/[\u0980-\u09ff]/.test(typed))return fail('Please write your speaking answer in English.');
-  else if(typed.trim().length<15)return fail('Record an answer or enter at least 15 characters for text-only feedback.');
-  if(kind!=='free'){if(!hasAudio)return fail('A recorded answer is required for this learning stage.',409);const s=await learningContext(uid);if(s.stage.type!==kind||s.stage.day!==day)return fail('Finish your current learning stage first.',409);if(!(kind==='daily'?dailyQuestions(day,bank):stageQuestions(day,kind,bank,s.content,examQuestions)).some(v=>v.id===q.id))return fail('This question is not assigned to this stage.',409);}
-  const date=now().slice(0,10),limit=Math.max(1,Math.min(100,Number(E().DAILY_AI_LIMIT)||20));const used=await execute('INSERT INTO usage (user_id,date,count) VALUES (?,?,1) ON CONFLICT(user_id,date) DO UPDATE SET count=count+1 WHERE count<?',uid,date,limit);if(!used.meta.changes)return fail('Daily assessment limit reached. Try again tomorrow.',429);
-  try{const bytes=hasAudio?await audio.arrayBuffer():null;if(bytes){const b=new Uint8Array(bytes);const valid=(b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)||String.fromCharCode(...b.subarray(0,4))==='OggS'||String.fromCharCode(...b.subarray(0,4))==='RIFF'||String.fromCharCode(...b.subarray(4,8))==='ftyp';if(!valid)return fail('This file is not a supported audio recording.');}const feedback=await assess(config,q,hasAudio?transcript:typed,bytes,hasAudio?audio.type:'');if(hasAudio&&((feedback.transcript||transcript).replace(/\[unclear\]/gi,'').trim().length<5))return fail('No clear spoken answer was detected. Try recording again in a quieter place.',422);const id=crypto.randomUUID();
-   const receipt=await issueReceipt({id,userId:uid,questionId:q.id,kind,day,recorded:hasAudio,reviewed:false,scores:['fluency','lexical','grammar','pronunciation'].map(k=>(feedback.criteria as any)[k].score),exp:Date.now()+12*3600000},receiptSecret());
-   return response({id,receipt,feedback,audioSaved:false,textOnly:!hasAudio,storage:'session-only'});
-  }catch(e){return fail(assessmentFailureMessage(e),502);}
- }
- if(req.method==='POST'&&path==='record')return fail('Permanent recording storage is disabled. Submit your audio directly for temporary assessment.',410);
- if(req.method==='POST'&&path==='evaluate')return fail('New feedback is temporary. Record or type this answer again to assess it in this tab.',410);
- if(req.method==='POST'&&path==='review-attempt'){
-  const body:any=await req.json();const receipt=await proof(body?.receipt,uid);if(!receipt)return fail('Assessment proof expired or is invalid. Assess this answer again.',409);
-  return response({ok:true,receipt:await issueReceipt({...receipt,reviewed:true},receiptSecret())});
- }
+ if(path==='submit'&&req.method==='POST')return fail('Use a complete speaking session for Part-based AI assessment.',410);
  if(req.method==='POST'&&path==='message'){const b=z.object({subject:z.string().min(3).max(160),body:z.string().min(10).max(5000)}).parse(await req.json());if(/[\u0980-\u09ff]/.test(b.subject+b.body))return fail('Please write your message in English.');const recent=await rows('SELECT id FROM messages WHERE user_id=? AND created_at>?',uid,new Date(Date.now()-3600000).toISOString());if(recent.length>=5)return fail('You can send up to five support messages per hour.',429);await execute("INSERT INTO messages (id,user_id,subject,body,reply,status,created_at) VALUES (?,?,?,?,'','open',?)",crypto.randomUUID(),uid,b.subject,b.body,now());return response({ok:true});}
  if(req.method==='POST'&&path==='practice-result'){
   const b=z.object({receipts:z.array(z.string().max(4000)).min(3).max(20),questionIds:z.array(z.string().max(100)).min(3).max(20),bookNumber:z.number().int().min(1).max(240).optional(),bookMode:z.enum(['practice','exam']).optional(),sessionId:z.string().uuid()}).parse(await req.json());
