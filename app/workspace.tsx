@@ -45,7 +45,7 @@ const dateLabel=(value:string)=>new Date(value).toLocaleDateString('en-GB',{day:
 
 export default function Workspace(){
  const [view,setView]=useState<View>('dashboard'),[data,setData]=useState<any>(empty),[bank,setBank]=useState<Question[]>(initialQuestions),[loading,setLoading]=useState(true),[notice,setNotice]=useState(''),[toast,setToast]=useState(''),[dark,setDark]=useState(true),[mobile,setMobile]=useState(false),[modal,setModal]=useState<string|null>(null);
- const [selected,setSelected]=useState<Question>(initialQuestions[0]),[session,setSession]=useState<{kind:string;day:number;list:Question[]}|null>(null),[qindex,setQindex]=useState(0);
+ const [selected,setSelected]=useState<Question>(initialQuestions[0]),[session,setSession]=useState<{kind:string;day:number;list:Question[];sessionId?:string}|null>(null),[qindex,setQindex]=useState(0);
  const [search,setSearch]=useState(''),[part,setPart]=useState('all'),[topic,setTopic]=useState('all'),[difficulty,setDifficulty]=useState('all'),[onlySaved,setOnlySaved]=useState(false),[page,setPage]=useState(0);
  const [recording,setRecording]=useState(false),[paused,setPaused]=useState(false),[elapsed,setElapsed]=useState(0),[transcript,setTranscript]=useState(''),[interim,setInterim]=useState(''),[segments,setSegments]=useState<{time:number;text:string}[]>([]),[notes,setNotes]=useState(''),[audio,setAudio]=useState<Blob|null>(null),[audioUrl,setAudioUrl]=useState(''),[attemptId,setAttemptId]=useState(''),[busy,setBusy]=useState(false),[feedback,setFeedback]=useState<any>(null),[feedbackTab,setFeedbackTab]=useState('corrections'),[hint,setHint]=useState(false),[accent,setAccent]=useState('en-GB'),[speechStatus,setSpeechStatus]=useState(''),[reviewFilter,setReviewFilter]=useState('all'),[lesson,setLesson]=useState<number|null>(null),[examMode,setExamMode]=useState('practice'),[prep,setPrep]=useState<number|null>(null),[adminData,setAdminData]=useState<any>(null),[adminInput,setAdminInput]=useState('');
  const [micError,setMicError]=useState<any>(null),[speechLanguage,setSpeechLanguage]=useState('en-US'),[permission,setPermission]=useState('unknown'),[typedAnswer,setTypedAnswer]=useState(''),[showHistory,setShowHistory]=useState(false),[showAllLessons,setShowAllLessons]=useState(false),[examTab,setExamTab]=useState('weekly'),[examPage,setExamPage]=useState(0),[integrationKey,setIntegrationKey]=useState(''),[connectionBusy,setConnectionBusy]=useState(false),[connectionMessage,setConnectionMessage]=useState(''),[editorQuestion,setEditorQuestion]=useState({part:1,topic:'Education',text:'',cue:''});
@@ -101,23 +101,28 @@ export default function Workspace(){
   if(!matching){notify('No complete book is available for this topic.');return}
   openBook(matching,'practice');
  }
- function startSession(kind='daily',requestedDay?:number){
-  if(recording||busy)return;sessionCreatedAt.current=Date.now();
+ async function startSession(kind='daily',requestedDay?:number){
+  if(recording||busy)return;
   const stage=data.stage;
-  if(kind==='daily'&&stage.type!=='daily'){notify('Complete your required weekly or revision assessment before the next daily lesson.');navigate('examiner');return}
+  if(kind==='daily'&&stage.type!=='daily'){notify('Complete your required weekly or revision assessment before the next daily module.');navigate('examiner');return}
   const exam=(kind==='weekly'||kind==='revision')?content.exams.find(e=>e.kind===kind&&e.day===requestedDay):null;
   if(kind!=='daily'){
-   if(!exam){notify('Choose an available weekly or revision exam from the list.');return}
+   if(!exam){notify('Choose an available weekly or revision exam.');return}
    const gate=weeklyGate(data.tests,kind as 'weekly'|'revision',exam.number);
    if(!gate.unlocked){notify(gate.reason);return}
-   if(data.tests.some((t:any)=>t.kind===kind&&t.milestone===exam.day&&passedTest(t))){notify('This exam was already passed. Choose the next unlocked exam.');return}
   }
   const day=kind==='daily'?stage.day:exam!.day;
   const list=kind==='daily'?dailyQuestions(day,bank):stageQuestions(day,kind,bank,content,examQuestions);
-  if(!list.length){notify('No questions are available for this exam.');return}
-  clearPartSession();setActiveBook(null);sessionAttempts.current={};setPracticeResult(null);
-  setSession({kind,day,list});setQindex(0);reset(list[0]);navigate('practice');
-  if(kind!=='daily'&&list[0].part===2)setPrep(60);
+  if(!list.length){notify('No questions are available for this session.');return}
+  setBusy(true);
+  try{
+   const admitted=await api('begin-session',{kind,day,mode:kind==='daily'?'practice':'exam'});
+   sessionCreatedAt.current=Date.parse(admitted.startedAt);
+   clearPartSession();setActiveBook(null);sessionAttempts.current={};setPracticeResult(null);
+   setData((current:any)=>({...current,scheduling:admitted.scheduling}));
+   setSession({kind,day,list,sessionId:admitted.sessionId});setQindex(0);reset(list[0]);navigate('practice');
+   if(kind!=='daily'&&list[0].part===2)setPrep(60);
+  }catch(e){notify((e as Error).message)}finally{setBusy(false)}
  }
  function rememberAttempt(attempt:any){volatile.current.owner=data.user?.id||'';volatile.current.attempts=[attempt,...volatile.current.attempts.filter(a=>a.id!==attempt.id)];setData((current:any)=>({...current,attempts:[attempt,...current.attempts.filter((a:any)=>a.id!==attempt.id)]}));}
  async function save(type:string,key:string,value:any,reviewed=false,remove=false){const existing=volatile.current.saved??data.saved;const next=existing.filter((s:any)=>s.type!==type||s.key!==key);if(!remove)next.push({type,key,data:value,reviewed});volatile.current.owner=data.user?.id||'';volatile.current.saved=next;setData((current:any)=>({...current,saved:next}));notify(remove?'Removed from this tab.':reviewed?'Reviewed in this tab.':'Kept in this tab only. Download a copy before leaving.');}
@@ -131,7 +136,7 @@ export default function Workspace(){
   if(id!==transcriptSession.current)return;
   const controller=new AbortController();transcribeAbort.current=controller;
   const job=(async()=>{
-   try{const form=new FormData();form.append('audio',blob,blob.type.includes('wav')?'answer.wav':'answer.webm');form.append('language',speechLanguage);
+   try{const form=new FormData();form.append('audio',blob,blob.type.includes('wav')?'answer.wav':'answer.webm');form.append('language',speechLanguage);form.append('sessionId',session?.sessionId||'');
     const r=await fetch('/api/transcribe',{method:'POST',body:form,signal:controller.signal});const result:any=await r.json();if(!r.ok)throw new Error(result.error||'Automatic transcription could not finish.');if(id!==transcriptSession.current)return;
     if(result.transcript?.trim()){original.current=result.transcript;setTranscript(result.transcript);setSegments([]);cloudSeen.current=true;setInterim('');interimRef.current='';setSpeechStatus(final?'Automatic transcript ready · original spoken language preserved':'Audio transcript updated · refreshes about every 12 seconds');setTranscriptError('');}
     else if(final){setSpeechStatus(original.current?'Recording finished. Review the recognised words.':'No speech was detected. Check the microphone level and try again.');}
@@ -149,6 +154,7 @@ export default function Workspace(){
   try{r.start();setSpeechStatus('Listening · words appear as you speak');}catch{setSpeechStatus('Automatic audio transcription will appear shortly.');}
  }
  async function startRecording(){
+  if(!session?.sessionId){notify('Please begin an available speaking practice or test before recording.');return}
   if(draftAnswersRef.current[selected.id]||partReports[selected.part]){notify('This question has already been answered. In practice, it becomes available again after 15 days.');return}
   if(session&&Date.now()-sessionCreatedAt.current>=86400000){clearPartSession();setSession(null);notify('Temporary recording session expired after 24 hours. Start a new practice book.');return}
   if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){setMicError({title:'Recording needs a supported, secure browser',message:'Open Speak Station directly in Chrome or Edge over HTTPS. You can also type an answer below.'});return}const embedded=window.self!==window.top;const policy=(document as any).permissionsPolicy||(document as any).featurePolicy;const allowed=policy?.allowsFeature?policy.allowsFeature('microphone'):true;if(!allowed){setMicError(microphoneError('NotAllowedError',embedded,false));return}setMicError(null);
@@ -189,7 +195,7 @@ export default function Workspace(){
   if(!data.user){setModal('signin');return}
   if(!data.aiConfigured){if(data.isAdmin)setModal('integration');else notify('AI connection is not available. Contact the site owner.');return}
   const form=new FormData();
-  form.append('meta',JSON.stringify({kind:session.kind,day:session.day,part,
+  form.append('meta',JSON.stringify({kind:session.kind,day:session.day,part,sessionId:session.sessionId,
    ...(activeBook?{bookNumber:activeBook.number}:{}),
    answers:group.map(q=>({questionId:q.id,transcript:source[q.id].transcript,duration:source[q.id].duration}))}));
   for(const [i,q] of group.entries()){
@@ -228,13 +234,19 @@ export default function Workspace(){
  async function testAudioConnection(){setConnectionBusy(true);setConnectionMessage('Transcribing a short synthetic voice sample. This does not create a learning attempt…');try{const sample=await fetch('/transcription-check.wav');if(!sample.ok)throw new Error('The audio test sample could not load.');const f=new FormData();f.append('audio',new Blob([await sample.arrayBuffer()],{type:'audio/wav'}),'transcription-check.wav');f.append('language','auto');const result=await api('transcribe',f);if(!result.transcript?.trim())throw new Error('No speech was detected in the audio test. Please retry.');setConnectionMessage('Audio transcription test passed. Recognised words: '+(result.transcript||'[no speech detected]'));}catch(e){setConnectionMessage((e as Error).message);}finally{setConnectionBusy(false);}}
  async function testSavedConnection(){setConnectionBusy(true);setConnectionMessage('Running a real Gemini feedback test. This will not create a learning attempt…');try{const result=await api('integration/test',{});setConnectionMessage(`Assessment test passed with ${result.model}. Returned ${result.corrections} sentence corrections and ${result.vocabulary} vocabulary suggestions.${result.sampleCorrection?' Sample correction: '+result.sampleCorrection:''}`)}catch(e){setConnectionMessage((e as Error).message)}finally{setConnectionBusy(false)}}
 
- function openBook(book:SpeakingBook,mode:'practice'|'exam'='practice'){
+ async function openBook(book:SpeakingBook,mode:'practice'|'exam'='practice'){
   if(recording||busy)return;
   const until=bookUntil(book);
-  if(until){notify('Questions in this book rest for 15 days. Unlock date: '+new Date(until).toLocaleDateString('en-GB')+'.');return}
-  sessionCreatedAt.current=Date.now();clearPartSession();sessionAttempts.current={};setPracticeResult(null);setActiveBook(book);setBookMode(mode);setExamMode(mode);
-  setSession({kind:'free',day:book.number,list:book.questions});
-  setQindex(0);reset(book.questions[0]);navigate('practice');
+  if(mode==='practice'&&until){notify('Questions in this book unlock again on '+new Date(until).toLocaleDateString('en-GB')+'.');return}
+  setBusy(true);
+  try{
+   const admitted=await api('begin-session',{kind:'free',day:book.number,mode});
+   sessionCreatedAt.current=Date.parse(admitted.startedAt);
+   clearPartSession();sessionAttempts.current={};setPracticeResult(null);setActiveBook(book);setBookMode(mode);setExamMode(mode);
+   setData((current:any)=>({...current,scheduling:admitted.scheduling}));
+   setSession({kind:'free',day:book.number,list:book.questions,sessionId:admitted.sessionId});
+   setQindex(0);reset(book.questions[0]);navigate('practice');
+  }catch(e){notify((e as Error).message)}finally{setBusy(false)}
  }
  function openMock(number:number,revision=false){const kind=revision?'revision':'weekly';const chosen=content.exams.find(e=>e.kind===kind&&e.number===number);if(chosen)startSession(kind,chosen.day)}
  function partEstimate(partNumber:number):number|null{
@@ -288,7 +300,7 @@ export default function Workspace(){
   if(session.kind==='free'){
    setBusy(true);
    try{
-    setPracticeResult(await api('practice-result',{receipts:sessionReceipts(),questionIds:session.list.map(q=>q.id),...(activeBook?{bookNumber:activeBook.number,bookMode}:{})}));
+    setPracticeResult(await api('practice-result',{sessionId:session.sessionId,receipts:sessionReceipts(),questionIds:session.list.map(q=>q.id),...(activeBook?{bookNumber:activeBook.number,bookMode}:{})}));
     if(activeBook)await refresh();
     setModal('free-complete');
    }catch(e){setAssessmentError((e as Error).message);notify((e as Error).message)}
@@ -296,7 +308,7 @@ export default function Workspace(){
   }else await completeStage();
  }
 
- async function completeStage(){setBusy(true);try{const next=await api('complete-stage',{receipts:sessionReceipts()});setData({...next,attempts:[...volatile.current.attempts,...next.attempts],saved:volatile.current.saved??next.saved});setPracticeResult(next.stageResult||null);setModal('complete')}catch(e){setAssessmentError((e as Error).message);notify((e as Error).message)}finally{setBusy(false)}}
+ async function completeStage(){setBusy(true);try{const next=await api('complete-stage',{sessionId:session?.sessionId,receipts:sessionReceipts()});setData({...next,attempts:[...volatile.current.attempts,...next.attempts],saved:volatile.current.saved??next.saved});setPracticeResult(next.stageResult||null);setModal('complete')}catch(e){setAssessmentError((e as Error).message);notify((e as Error).message)}finally{setBusy(false)}}
  function showSample(){if(recording){notify('Finish your recording before opening sample feedback.');return}const book=books.find(b=>b.questions.some(q=>q.id===initialQuestions[0].id))||books[0];if(book){setActiveBook(book);setBookMode('practice');setSession({kind:'free',day:book.number,list:book.questions});setQindex(Math.max(0,book.questions.findIndex(q=>q.id===initialQuestions[0].id)))}reset(initialQuestions[0]);setFeedback(sampleFeedback);setFeedbackTab('overview');setAttemptId('');setTranscript('I am living in Dhaka since five years. I like my hometown because it is very good. There are many things. I like it.');original.current='';setSelected(initialQuestions[0]);navigate('practice');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('feedback-report')?.scrollIntoView({behavior:'smooth'})))}
  async function loadAttempt(a:any){if(recording)return;const q=bank.find(q=>q.id===a.question_id)||initialQuestions[0];const book=books.find(b=>b.questions.some(item=>item.id===q.id))||books.find(b=>b.topic===q.topic)||books[0];if(book){setActiveBook(book);setBookMode('practice');setSession({kind:'free',day:book.number,list:book.questions});setQindex(Math.max(0,book.questions.findIndex(item=>item.id===q.id)))}reset(q);setAttemptId(a.id);setTranscript(a.transcript.replace(/[\u0980-\u09ff]+(?:[ \t]+[\u0980-\u09ff]+)*/g,'[non-English speech]'));original.current=a.transcript;setElapsed(a.duration);setAudioUrl(a.audio_key?`/api/audio/${a.id}`:'');setFeedback(a.feedback);setFeedbackTab('overview');navigate('practice')}
  async function retryEvaluation(a:any){setBusy(true);try{const r=await api('evaluate',{id:a.id});await refresh();loadAttempt({...a,feedback:r.feedback})}catch(e){notify((e as Error).message)}finally{setBusy(false)}}
@@ -334,6 +346,7 @@ export default function Workspace(){
   {isHome&&<div className="ai-disclaimer-banner" data-cms-skip><Shield size={18}/><span><strong>AI assessment notice:</strong> All scores, transcripts and corrections are practice estimates and may contain errors. Speak Station is not an official IELTS examiner. Check your actual level with an official IELTS test.</span></div>}
   {isHome&&<section id="home" className="home-section">
    {header(name?content.brand.greeting.replace('{name}',name):content.brand.guestGreeting,"Your practice, exams and progress. One home for everything.",<span className="date-label"><Clock size={15}/>{new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'Asia/Dhaka'})}</span>)}
+   {data.user&&<div className="session-limit-panel"><div><strong><Clock size={15}/> Speaking schedule</strong><span>One practice every 6 hours · up to 4 per rolling 24 hours · one test every 7 days after two completed modules.</span></div><div className="session-limit-counters"><span>Practices in last 24h: {data.scheduling?.practice?.recentCount??0}/4</span><span>Modules in last 7 days: {data.scheduling?.test?.modulesCompleted??0}/2</span></div>{!data.scheduling?.practice?.allowed&&<p>Practice locked: {data.scheduling.practice.reason} {data.scheduling.practice.nextAt?'Next: '+new Date(data.scheduling.practice.nextAt).toLocaleString():''}</p>}{!data.scheduling?.test?.allowed&&<p>Test locked: {data.scheduling.test.reason} {data.scheduling.test.nextAt?'Next: '+new Date(data.scheduling.test.nextAt).toLocaleString():''}</p>}</div>}
    <div className="home-jumps">{content.navigation.filter(n=>n.visible).map(n=><button key={n.id} onClick={()=>n.target==='practice'&&!session?startSession():document.getElementById(n.target==='topics'?'books':n.target)?.scrollIntoView({behavior:'smooth'})}>{n.target==='topics'?'Complete Speaking Books':n.label}<ArrowRight size={13}/></button>)}</div><section className="hero"><div className="hero-copy"><div className="hero-kicker"><span className="live-dot"/> YOUR DAILY MOMENT OF PROGRESS</div><h2>Speak a little.<br/>Grow a little <em>bolder.</em></h2><p>Find your words, learn from every answer, and get one<br className="desktop-only"/> step closer to your IELTS speaking goal.</p><Button onClick={()=>availableBooks.length?openBook(availableBooks[0],'practice'):notify('All visible practice books are resting. Try another topic or come back after their cooldown.')}><Mic size={17}/>Start speaking practice<ArrowRight size={17}/></Button><button className="hero-books-link" onClick={()=>document.getElementById('books')?.scrollIntoView({behavior:'smooth'})}>Explore {books.length} complete test books <ArrowRight size={15}/></button><div className="hero-meta"><span><Clock size={14}/> About 20 minutes</span><span><CheckCircle2 size={14}/>Parts 1, 2 and 3</span></div></div><div className="hero-art" aria-hidden="true"><span className="art-star">✦</span><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="art-bubble bubble-top"><span>One answer at a time.</span><Sparkles size={15}/></div><div className="mic-orb"><Mic size={76} strokeWidth={1.3}/><div className="orb-wave">{Array.from({length:15},(_,i)=><i key={i} style={{height:8+Math.sin(i*1.7)**2*25}}/>)}</div></div><div className="art-bubble bubble-bottom"><span className="art-check"><Check size={16}/></span>Your voice matters.</div><span className="art-spark">+</span></div></section>
    <div className="stats-grid">{content.statCards.filter(s=>s.area==='home').map((s,i)=><div className="stat-card" key={s.id}><span className={`stat-icon ${['peach','sage','lavender','gold'][i%4]}`}><TrendingUp size={23}/></span><div><span>{s.label}</span><strong>{metric(s.metric)}{s.metric==='target'&&<small> / 9</small>}</strong>{s.metric==='target'?<button className="text-link" onClick={()=>navigate('profile')}>{s.caption}<ArrowRight size={14}/></button>:<p>{s.caption}</p>}</div></div>)}</div>
    <div className="quick-home-grid">{content.featureCards.filter(s=>s.action!=='connection'||data.isAdmin).map((s,i)=><article className="quick-home-card" key={s.id}><span className={`stat-icon ${['sage','peach','lavender'][i%3]}`}><Sparkles size={23}/></span><div><h3>{s.title}</h3><p>{s.body==='Permanent audio saving is off by default. Your transcript and feedback stay together in progress.'?'Only completed days and passed tests are kept as learning progress. New audio and detailed feedback stay in this tab.':s.body}</p><button className="text-link" onClick={()=>s.action==='daily'?startSession():setModal(s.action==='connection'?'integration':'journey')}>{s.button}<ArrowRight size={15}/></button></div></article>)}</div>
@@ -378,10 +391,11 @@ export default function Workspace(){
    {header('Your weekly speaking exams.','Pass each weekly exam with at least 6.0/9. After two weekly passes, complete a mandatory revision before unlocking the next weekly test.')}
    <article className="sample-mock-card sample-mock-preview" data-cms-skip><div><span className="book-eyebrow">SAMPLE MOCK · PREVIEW ONLY</span><h3>Preview a complete speaking mock</h3><p>Exam questions are more demanding than guided practice. See the three speaking parts and their timing before taking a real weekly or revision exam.</p><div className="sample-mock-parts"><div><b>Part 1 · 4–5 minutes</b><span>Familiar personal interview questions</span><p>{books[0]?.questions.find(q=>q.part===1)?.text||'What do you like about your hometown?'}</p></div><div><b>Part 2 · 3–4 minutes</b><span>1-minute preparation + up to 2-minute talk</span><p>{books[0]?.questions.find(q=>q.part===2)?.text||'Describe an important experience.'}</p></div><div><b>Part 3 · 4–5 minutes</b><span>Extended discussion and explanation</span><p>{books[0]?.questions.find(q=>q.part===3)?.text||'Why do some people change their views over time?'}</p></div></div><small>Preview only · no recording, no assessment, no score and no exam attempt.</small></div></article>
    <div className="exam-catalog-top"><div><Pill tone="neutral">EXAM COLLECTION</Pill><h2>{weeklySets.length} weekly exams. {revisionCatalog.length} revision checkpoints.</h2><p>Each exam contains Parts 1, 2 and 3. Only the next eligible exam can be started.</p></div><div className="exam-track"><span>Current learning stage</span><strong>{data.stage.type} · Day {day}</strong><Button secondary onClick={()=>data.stage.type==='daily'?startSession():startSession(data.stage.type,data.stage.day)}><Play size={15}/>Continue my track</Button></div></div><div className="tabs">{[['weekly',`Weekly exams · ${weeklySets.length}`],['revision',`Revision exams · ${revisionCatalog.length}`]].map(([v,l])=><button key={v} className={examTab===v?'selected':''} onClick={()=>{setExamTab(v);setExamPage(0)}}>{l}</button>)}</div><div className="exam-set-grid">{(examTab==='weekly'?weeklySets:revisionCatalog).slice(examPage*6,examPage*6+6).map((test:any)=>{
+    const policy= data.scheduling?.test;
     const gate=weeklyGate(data.tests,examTab as 'weekly'|'revision',test.number);
     const passed=data.tests.some((t:any)=>t.kind===examTab&&t.milestone===test.day&&passedTest(t));
     const prior=data.tests.filter((t:any)=>t.kind===examTab&&t.milestone===test.day);
-    return <article className={`exam-set ${!gate.unlocked?'exam-locked':''}`} key={test.number}><div className="card-top"><Pill tone="neutral">{examTab==='weekly'?'WEEKLY':'REVISION'} {String(test.number).padStart(2,'0')}</Pill>{passed?<CheckCircle2 size={17}/>:!gate.unlocked?<Lock size={17}/>:<span className="exam-milestone">Ready</span>}</div><h3>{test.title}</h3><p>{test.description}</p><div className="exam-parts"><span>Part 1</span><span>Part 2</span><span>Part 3</span></div><strong className="weekly-score-line">{passed?'Passed · 6.0/9 minimum':prior.length?'Previous attempt recorded · try again':'Pass mark · 6.0 / 9'}</strong><Button secondary disabled={!gate.unlocked||passed} onClick={()=>startSession(examTab,test.day)}>{passed?<Check size={15}/>:gate.unlocked?<Mic size={15}/>:<Lock size={15}/>} {passed?'Completed':gate.unlocked?'Start exam':'Locked'}</Button><span className="exam-gate">{passed?'Next exam unlocked':gate.reason}</span></article>})}</div><div className="pagination"><span>Showing sets {examPage*6+1}–{Math.min(examPage*6+6,examTab==='weekly'?30:15)}</span><Button secondary disabled={examPage===0} onClick={()=>setExamPage(examPage-1)}><ChevronLeft size={15}/>Previous</Button><Button secondary disabled={(examPage+1)*6>=(examTab==='weekly'?30:15)} onClick={()=>setExamPage(examPage+1)}>Next<ChevronRight size={15}/></Button></div><p className="content-note">Weekly and revision exams unlock in order. Passing requires 6.0/9 or higher. Failed results are saved for progress but do not unlock the next exam.</p>
+    return <article className={`exam-set ${!gate.unlocked?'exam-locked':''}`} key={test.number}><div className="card-top"><Pill tone="neutral">{examTab==='weekly'?'WEEKLY':'REVISION'} {String(test.number).padStart(2,'0')}</Pill>{passed?<CheckCircle2 size={17}/>:!gate.unlocked?<Lock size={17}/>:<span className="exam-milestone">Ready</span>}</div><h3>{test.title}</h3><p>{test.description}</p><div className="exam-parts"><span>Part 1</span><span>Part 2</span><span>Part 3</span></div><strong className="weekly-score-line">{passed?'Passed · 6.0/9 minimum':prior.length?'Previous attempt recorded · try again':'Pass mark · 6.0 / 9'}</strong><Button secondary disabled={!gate.unlocked||passed||policy?.allowed===false} onClick={()=>startSession(examTab,test.day)}>{passed?<Check size={15}/>:gate.unlocked?<Mic size={15}/>:<Lock size={15}/>} {passed?'Completed':gate.unlocked&&policy?.allowed!==false?'Start exam':'Locked'}</Button><span className="exam-gate">{passed?'Next exam unlocked':!gate.unlocked?gate.reason:policy?.allowed===false?policy.reason:gate.reason}</span></article>})}</div><div className="pagination"><span>Showing sets {examPage*6+1}–{Math.min(examPage*6+6,examTab==='weekly'?30:15)}</span><Button secondary disabled={examPage===0} onClick={()=>setExamPage(examPage-1)}><ChevronLeft size={15}/>Previous</Button><Button secondary disabled={(examPage+1)*6>=(examTab==='weekly'?30:15)} onClick={()=>setExamPage(examPage+1)}>Next<ChevronRight size={15}/></Button></div><p className="content-note">Weekly and revision exams unlock in order. Passing requires 6.0/9 or higher. Failed results are saved for progress but do not unlock the next exam.</p>
   </section>}
   {isHome&&<section id="revision" className="home-section"><div className="lightweight-review"><div><h2>Review your progress</h2><p>Detailed answers and feedback stay in the current session. Only your Part scores and overall estimated band are saved for later.</p></div><Button secondary onClick={()=>document.getElementById('progress')?.scrollIntoView({behavior:'smooth'})}><BarChart3 size={16}/>View score history</Button></div></section>}
   {isHome&&<section id="progress" className="home-section">
