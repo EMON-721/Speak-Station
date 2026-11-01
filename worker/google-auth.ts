@@ -30,13 +30,17 @@ export async function standaloneIdentity(request:Request,env:any,standaloneBuild
   }
   const pending=await verifyAuth(cookie(request,'__Host-speak-oauth'),secret),code=url.searchParams.get('code');
   if(!pending||pending.state!==url.searchParams.get('state')||!code||url.searchParams.has('error'))return new Response('Sign-in expired or could not be verified. Start sign-in again.',{status:400,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':setCookie('__Host-speak-oauth','',0)}});
+  let oauthStage='token_exchange';
   try{
-   const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',redirect:'error',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:origin+'/callback',grant_type:'authorization_code',code_verifier:pending.verifier}),signal:AbortSignal.timeout(20000)});if(!tokenResponse.ok)throw new Error('TOKEN_EXCHANGE_FAILED');const token:any=await tokenResponse.json();if(!token.access_token)throw new Error('MISSING_TOKEN');
-   const profileResponse=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{redirect:'error',headers:{Authorization:'Bearer '+token.access_token},signal:AbortSignal.timeout(20000)});if(!profileResponse.ok)throw new Error('PROFILE_FAILED');const profile:any=await profileResponse.json();
+   const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',redirect:'error',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:origin+'/callback',grant_type:'authorization_code',code_verifier:pending.verifier}),signal:AbortSignal.timeout(20000)});if(!tokenResponse.ok){console.error('GOOGLE_OAUTH_FAILURE',JSON.stringify({stage:oauthStage,status:tokenResponse.status}));throw new Error('TOKEN_EXCHANGE_FAILED');}const token:any=await tokenResponse.json();if(!token.access_token)throw new Error('MISSING_TOKEN');
+   oauthStage='profile_fetch';
+   const profileResponse=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{redirect:'error',headers:{Authorization:'Bearer '+token.access_token},signal:AbortSignal.timeout(20000)});if(!profileResponse.ok){console.error('GOOGLE_OAUTH_FAILURE',JSON.stringify({stage:oauthStage,status:profileResponse.status}));throw new Error('PROFILE_FAILED');}const profile:any=await profileResponse.json();
+   oauthStage='identity_validation';
    if(typeof profile.sub!=='string'||typeof profile.email!=='string'||profile.email_verified!==true)throw new Error('VERIFIED_IDENTITY_REQUIRED');
+   oauthStage='session_signing';
    const session=await signAuth({sub:profile.sub,email:profile.email,name:typeof profile.name==='string'?profile.name:profile.email,exp:Date.now()+7*86400000},secret);
    return redirect(origin+safeReturn(pending.returnTo),[setCookie('__Host-speak-session',session,7*86400),setCookie('__Host-speak-oauth','',0)]);
-  }catch{return new Response('Google sign-in could not finish. Please start again.',{status:502,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':setCookie('__Host-speak-oauth','',0)}});}
+  }catch(error){if(!(error instanceof Error&&['TOKEN_EXCHANGE_FAILED','PROFILE_FAILED'].includes(error.message)))console.error('GOOGLE_OAUTH_FAILURE',JSON.stringify({stage:oauthStage,reason:'unexpected_failure'}));return new Response('Google sign-in could not finish. Please start again.',{status:502,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':setCookie('__Host-speak-oauth','',0)}});}
  }
  const session=configured?await verifyAuth(cookie(request,'__Host-speak-session'),secret):null;
  if(session&&typeof session.sub==='string'&&typeof session.email==='string'){
