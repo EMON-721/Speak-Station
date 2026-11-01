@@ -57,3 +57,49 @@ jobs:
           echo "### Verification scope" >> "$GITHUB_STEP_SUMMARY"
           echo "Pure logic, real question bank, OAuth security and migration tests execute in this job." >> "$GITHUB_STEP_SUMMARY"
           echo "Live smoke verifies public endpoints only. Authenticated Google sign-in completion, live microphone, actual AI provider, admin access and mobile layouts still need independent end-to-end browser testing." >> "$GITHUB_STEP_SUMMARY"
+
+  browser_qa:
+    name: Desktop and mobile browser QA
+    runs-on: ubuntu-latest
+    needs: check
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install project
+        run: pnpm install --frozen-lockfile
+      - name: Install isolated Playwright Chromium
+        run: |
+          npm install --prefix /tmp/speak-playwright --no-save --package-lock=false playwright@1.58.2
+          /tmp/speak-playwright/node_modules/.bin/playwright install chromium --with-deps
+      - name: Start local test server
+        run: |
+          (pnpm run dev > /tmp/speak-dev.log 2>&1 & echo $! > /tmp/speak-dev.pid)
+          for i in $(seq 1 90); do
+            if curl -fsS -o /dev/null http://127.0.0.1:5173/; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/speak-dev.log
+          exit 1
+      - name: Verify desktop/mobile layout, profile, progress and speaking UI
+        env:
+          BROWSER_QA_ORIGIN: http://127.0.0.1:5173
+        run: node scripts/tests/browser-e2e.mjs
+      - name: Upload visual QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: speak-station-browser-qa
+          path: artifacts/browser-qa/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Server troubleshooting logs
+        if: failure()
+        run: tail -n 140 /tmp/speak-dev.log || true
