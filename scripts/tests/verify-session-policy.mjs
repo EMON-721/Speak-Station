@@ -17,7 +17,7 @@ assert.equal(p(records([0,6,12,18].map(h=>h*3600000)),23*3600000).recentCount,4)
 assert(!t([],[],0).allowed,'zero completed modules');
 assert(!t([],modules.slice(0,1),0).allowed,'only one completed module');
 assert(t([],modules,0).allowed,'two distinct completed modules');
-assert(!t([],modules.concat({module:'daily:1',completed_at:iso(-4000)}),0).modulesCompleted===3,'duplicate completion cannot inflate module count');
+assert.equal(t([],modules.concat({module:'daily:1',completed_at:iso(-4000)}),0).modulesCompleted,2,'duplicate completion cannot inflate module count');
 assert(!t(records([0],'test'),modules,TEST_INTERVAL_MS-1000).allowed,'test at six days 23h must be blocked');
 assert(t(records([0],'test'),modules.map(m=>({...m,completed_at:iso(TEST_INTERVAL_MS-1000)})),TEST_INTERVAL_MS).allowed,'test opens after exactly seven days with fresh modules');
 assert(!t([],modules,new Date(iso(TEST_INTERVAL_MS)).getTime()-base).allowed,'modules outside seven-day window no longer qualify');
