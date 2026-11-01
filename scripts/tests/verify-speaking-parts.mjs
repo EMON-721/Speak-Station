@@ -49,7 +49,7 @@ assert(frontend.includes("part-complete-action"),'completed part has a visible c
 assert(frontend.includes("'Ready to save'"),'unsaved audio has a clear status');
 assert(frontend.includes("assessCompletedPart"),'part assessment exists');
 assert(backend.includes("expected.some((q,i)=>q.id!==ids[i])"),'server validates complete assigned part');
-assert(backend.includes("summarizeSpeakingParts(valid,expected"),'daily/weekly final score covers all parts');
+assert(backend.includes("summarizeSpeakingParts(valid,assigned"),'daily/weekly final score covers all parts');
 assert(assessment.includes("One authenticated Gemini generation")&&assessment.includes("await fetch("),'one Gemini assessment request per part');
 const css=fs.readFileSync('app/globals.css','utf8');
 assert(css.includes("/* November: keep the book explorer"),'book explorer CSS regression fix');
