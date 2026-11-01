@@ -80,3 +80,14 @@ assert.equal(expiry,'2026-11-16T06:00:00.000Z','practice question cooldown is ex
 assert.equal(isCoolingDown(expiry,new Date('2026-11-15T00:00:00Z')),true);
 assert.equal(isCoolingDown(expiry,new Date('2026-11-16T06:00:00Z')),false);
 console.log('PASS: weekly unlock, revision gating, 6.0 threshold and 15-day cooldown');
+
+
+const privacySafe=receipts.map((value,index)=>({...value,issues:{grammar:index===0?3:0,vocabulary:index===4?2:0,pronunciation:index===4?1:0,fluency:0,spelling:0,ideas:1},durationSeconds:index===0?120:index===4?150:index===5?90:0}));
+const privateSummary=summarizeSpeakingParts(privacySafe,q,6);
+assert.equal(privateSummary.issues.grammar,3,'one-part grammar counts are saved once, not multiplied by number of questions');
+assert.equal(privateSummary.issues.vocabulary,2,'numeric vocabulary observations can be tracked without storing corrected speech');
+assert.equal(privateSummary.issues.pronunciation,1,'pronunciation note count is preserved, not the recording');
+assert.equal(privateSummary.issues.spelling,0,'audio alone does not create unverified spelling mistakes');
+assert.equal(privateSummary.durationSeconds,360,'part durations are counted only once per part');
+assert.equal('transcript' in privateSummary,false,'score history does not contain raw transcripts');
+console.log('PASS: privacy-minimal mistake-category trends and speaking duration totals');
