@@ -5,16 +5,75 @@ import {defaultContent,type SiteContent} from './lib/content';
 export default function AdminConsole({content,revision,bank,api,onSaved}:{content:SiteContent;revision:number;bank:any[];api:(p:string,b?:any)=>Promise<any>;onSaved:()=>Promise<void>}){
  const [managedTopic,setManagedTopic]=useState('all'),[startWithAdd,setStartWithAdd]=useState(false);
  const [learnerDetails,setLearnerDetails]=useState<any>(null);
+ const [liveChecks,setLiveChecks]=useState<{name:string;status:'pass'|'fail'|'manual';detail:string}[]>([]);
+ const [liveCheckedAt,setLiveCheckedAt]=useState('');
  const [draft,setDraft]=useState<SiteContent>(content),[tab,setTab]=useState('Brand & theme'),[search,setSearch]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[overview,setOverview]=useState<any>(null),[collection,setCollection]=useState('exams'),[item,setItem]=useState<any>(null),[reason,setReason]=useState(''),[target,setTarget]=useState<any>(null),[action,setAction]=useState('ban'),[day,setDay]=useState(7),[kind,setKind]=useState('weekly');
  useEffect(()=>setDraft(content),[content]);
  async function run(fn:()=>Promise<any>){setBusy(true);setMessage('');try{await fn()}catch(e){setMessage((e as Error).message)}finally{setBusy(false)}}
  async function load(){const r=await api('admin/overview');setOverview(r);}
  useEffect(()=>{void load().catch(e=>setMessage(e.message));},[]);
+ async function productionDiagnostics(){
+  if(busy)return;
+  setBusy(true);setMessage('Running real, owner-authorized production checks…');
+  const results:{name:string;status:'pass'|'fail'|'manual';detail:string}[]=[];
+  try{
+   try{
+    const result=await api('admin/diagnostics');
+    for(const check of result.checks||[])results.push({name:check.name,status:check.status,detail:check.detail});
+   }catch(e){results.push({name:'Signed-in owner session and D1 checks',status:'fail',detail:(e as Error).message})}
+   try{
+    const result=await api('integration/test',{});
+    results.push({name:'Real AI feedback generation',status:'pass',detail:'Server-side model generation succeeded. Model: '+String(result.model||'configured model')});
+   }catch(e){results.push({name:'Real AI feedback generation',status:'fail',detail:(e as Error).message})}
+   try{
+    const sample=await fetch('/transcription-check.wav',{cache:'no-store'});
+    if(!sample.ok)throw Error('The sample audio could not load.');
+    const form=new FormData();form.append('audio',new Blob([await sample.arrayBuffer()],{type:'audio/wav'}),'transcription-check.wav');form.append('language','auto');
+    const response=await api('transcribe',form);
+    if(!response.transcript?.trim())throw Error('The audio provider did not recognise the sample.');
+    results.push({name:'Real audio-to-text transcription',status:'pass',detail:'Voice sample transcribed; the text is not saved in this diagnostic.'});
+   }catch(e){results.push({name:'Real audio-to-text transcription',status:'fail',detail:(e as Error).message})}
+   results.push({name:'Real device microphone capture',status:'manual',detail:'Use the separate microphone button below and speak during the recording.'});
+   setLiveChecks(results);setLiveCheckedAt(new Date().toLocaleString());
+   const count=results.filter(v=>v.status==='pass').length;
+   setMessage('Production checks: '+count+' passed; '+results.filter(v=>v.status==='fail').length+' failed. Real microphone is verified separately.');
+  }finally{setBusy(false)}
+ }
+ async function testMicrophone(){
+  if(busy)return;
+  setBusy(true);setMessage('Please speak an English sentence for four seconds after granting microphone permission.');
+  let stream:MediaStream|undefined;
+  try{
+   if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined')throw Error('This browser cannot access a MediaRecorder microphone.');
+   stream=await navigator.mediaDevices.getUserMedia({audio:true});
+   const type=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+   const recorder=new MediaRecorder(stream,type?{mimeType:type}:undefined);
+   const frames:BlobPart[]=[];
+   const done=new Promise<Blob>((resolve,reject)=>{
+    recorder.ondataavailable=e=>{if(e.data.size)frames.push(e.data)};
+    recorder.onerror=()=>reject(Error('Microphone recording failed.'));
+    recorder.onstop=()=>resolve(new Blob(frames,{type:recorder.mimeType||type||'audio/webm'}));
+   });
+   recorder.start(300);
+   await new Promise(resolve=>setTimeout(resolve,4500));
+   if(recorder.state!=='inactive')recorder.stop();
+   const voice=await done;
+   if(voice.size<500)throw Error('The microphone captured too little audio.');
+   const form=new FormData();form.append('audio',voice,'qa-microphone.webm');form.append('language','auto');
+   const result=await api('transcribe',form);
+   if(!String(result.transcript||'').trim())throw Error('Microphone worked but no speech was detected. Speak clearly and try again.');
+   setLiveChecks(list=>[...list.filter(v=>v.name!=='Real device microphone capture'),{name:'Real device microphone capture',status:'pass',detail:'Real browser recording and real server transcription succeeded. The raw recording is not stored here.'}]);
+   setMessage('Microphone-to-AI transcription passed with your device.');
+  }catch(e){
+   setLiveChecks(list=>[...list.filter(v=>v.name!=='Real device microphone capture'),{name:'Real device microphone capture',status:'fail',detail:(e as Error).message}]);
+   setMessage((e as Error).message);
+  }finally{stream?.getTracks().forEach(t=>t.stop());setBusy(false)}
+ }
  const update=(key:keyof SiteContent,value:any)=>setDraft({...draft,[key]:value});
  const field=(label:string,value:string|number,onChange:(v:string)=>void,type='text')=><label>{label}<input type={type} value={value} onChange={e=>onChange(e.target.value)}/></label>;
  const save=()=>run(async()=>{await api('admin/content',{content:draft,expectedRevision:revision});await onSaved();await load();setMessage('Website content published.');});
  const collections:any={statCards:{id:'stat-'+Date.now(),area:'home',label:'Practice statistic',metric:'attempts',caption:'Keep practising.'},milestones:{id:'milestone-'+Date.now(),title:'New milestone',metric:'days',minimum:14},featureCards:{id:'feature-'+Date.now(),title:'Your next step',body:'Add a useful message for your learners.',button:'Start practising',action:'daily'},navigation:{id:'nav-'+Date.now(),label:'New navigation',target:'practice',visible:true},exams:{id:'exam-'+Date.now(),number:draft.exams.length+1,kind:'weekly',day:Array.from({length:210},(_,i)=>i+1).find(d=>!draft.exams.some(e=>e.kind==='weekly'&&e.day===d))||1,title:'New speaking exam',description:'An original speaking practice set.',questionIds:[]},lessons:{id:'lesson-'+Date.now(),title:'New speaking lesson',category:'Speaking skills',summary:'A useful skill to practise.',body:'Explain the skill and give an example.',task:'Describe your own example.'},customSections:{id:'section-'+Date.now(),title:'New section',body:'Add your content here.',buttonLabel:'Start practising',target:'practice'}};
- return <section className="admin-console" data-cms-skip><div className="admin-toolbar"><div><span className="eyebrow">OWNER WORKSPACE</span><h2>Manage every part of your station.</h2><p>Signed in as {overview?.administratorEmail||'the verified owner'}. Access is checked on the server.</p></div><button className="button" disabled={busy} onClick={save}>{busy?'Working…':'Publish website changes'}</button></div><nav className="admin-tabs">{['Brand & theme','Page copy','Sections','Collections','Topics','Questions','Learners','Messages','Audit'].map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>{setTab(t);setItem(null);setSearch('');if(t==='Questions'){setManagedTopic('all');setStartWithAdd(false)}}}>{t}</button>)}</nav>{message&&<p className="admin-message" role="status">{message}</p>}
+ return <section className="admin-console" data-cms-skip><div className="admin-toolbar"><div><span className="eyebrow">OWNER WORKSPACE</span><h2>Manage every part of your station.</h2><p>Signed in as {overview?.administratorEmail||'the verified owner'}. Access is checked on the server.</p></div><button className="button" disabled={busy} onClick={save}>{busy?'Working…':'Publish website changes'}</button></div><nav className="admin-tabs">{['Brand & theme','Page copy','Sections','Collections','Topics','Questions','Learners','Messages','Audit','Live Diagnostics'].map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>{setTab(t);setItem(null);setSearch('');if(t==='Questions'){setManagedTopic('all');setStartWithAdd(false)}}}>{t}</button>)}</nav>{message&&<p className="admin-message" role="status">{message}</p>}
  {tab==='Brand & theme'&&<div className="panel"><h3>Identity & appearance</h3><div className="form-grid">{Object.entries(draft.brand).map(([k,v])=>field(k,v,n=>update('brand',{...draft.brand,[k]:n})))}{Object.entries(draft.theme).map(([k,v])=>(k==='headingFont'||k==='bodyFont')?<label key={k}>{k==='bodyFont'?'Body font':'Heading font'}<select value={v} onChange={e=>update('theme',{...draft.theme,[k]:e.target.value})}>{(k==='bodyFont'?['Arial','Trebuchet MS','Verdana']:['Georgia','Arial','Trebuchet MS']).map(f=><option key={f}>{f}</option>)}</select></label>:field(k,v,n=>update('theme',{...draft.theme,[k]:typeof v==='number'?Number(n):n}),typeof v==='number'?'number':'color'))}</div><p>Use {'{name}'} in the signed-in greeting. The practice pass threshold is 6.5/9.</p></div>}
  {tab==='Page copy'&&<section className="panel"><h3>Every heading, label, sentence and helper text</h3><p>Find the existing wording. Change it, leave its replacement empty to remove it, or restore its default. Learner transcripts and private answers are not editable page copy.</p><input aria-label="Search page copy" placeholder="Search visible text…" value={search} onChange={e=>setSearch(e.target.value)}/><div className="copy-list">{Object.keys({...defaultContent.copy,...draft.copy}).filter(k=>k.toLowerCase().includes(search.toLowerCase())).slice(0,search?100:30).map(k=><label key={k}><small>{k}</small><textarea value={draft.copy[k]??k} onChange={e=>update('copy',{...draft.copy,[k]:e.target.value})}/><button onClick={()=>update('copy',{...draft.copy,[k]:k})}>Restore default</button></label>)}</div><p>Showing {search?'up to 100 matching entries':'the first 30 entries; search to find any other text'}.</p></section>}
  {tab==='Sections'&&<div className="panel"><h3>Show, hide and reorder sections</h3>{draft.sectionOrder.map((id,i)=><div className="cms-row" key={id}><label><input type="checkbox" checked={!draft.hiddenSections.includes(id)} onChange={e=>update('hiddenSections',e.target.checked?draft.hiddenSections.filter(v=>v!==id):[...draft.hiddenSections,id])}/>{id}</label><button disabled={i===0} onClick={()=>{const v=[...draft.sectionOrder];[v[i-1],v[i]]=[v[i],v[i-1]];update('sectionOrder',v)}}>Move up</button><button disabled={i===draft.sectionOrder.length-1} onClick={()=>{const v=[...draft.sectionOrder];[v[i+1],v[i]]=[v[i],v[i+1]];update('sectionOrder',v)}}>Move down</button></div>)}<p>For an individual card or subsection, open the homepage and choose “Edit page layout”. Hidden elements can be restored below.</p>{draft.hiddenBlocks.map(id=><button key={id} onClick={()=>update('hiddenBlocks',draft.hiddenBlocks.filter(v=>v!==id))}>Restore {id}</button>)}</div>}
@@ -23,6 +82,16 @@ export default function AdminConsole({content,revision,bank,api,onSaved}:{conten
  {tab==='Questions'&&<QuestionManager bank={bank} topics={content.topics} initialTopic={managedTopic} addImmediately={startWithAdd} api={api} onSaved={onSaved} onBack={()=>setTab('Topics')}/>}
  {tab==='Learners'&&<section className="panel"><h3>Learner authority</h3><p>The owner account is protected. Every account action requires a reason and is recorded in the audit log.</p>{overview?.users.map((u:any)=><div className="cms-row" key={u.user_id}><span><strong>{u.name}</strong><small>{u.email||u.user_id} · {u.status||'active'}</small></span><button onClick={()=>run(async()=>{setLearnerDetails(await api('admin/learner?userId='+encodeURIComponent(u.user_id)));})}>View progress & feedback</button>{['ban','unban','delete-user','override-pass'].map(a=><button key={a} onClick={()=>{setTarget(u);setAction(a);setReason('')}}>{a}</button>)}</div>)}{learnerDetails&&<div className="learner-detail panel"><button onClick={()=>setLearnerDetails(null)}>Close learner details</button><h3>{learnerDetails.profile.name}</h3><p>{learnerDetails.days.length} learning days · {learnerDetails.tests.length} completed tests</p>{learnerDetails.tests.map((t:any)=><p key={t.id}>{t.kind} · day {t.milestone} · {t.details?.override?'Administrator override: '+t.details.reason:'Completed through assessment'}</p>)}{learnerDetails.attempts.map((a:any)=><details className="message-card" key={a.id}><summary>{a.question_id} · {a.status} · {a.feedback?.overall===null?'No full band estimate':a.feedback?.overall+'/9'}</summary><p>{a.transcript}</p>{a.audio_key&&<audio controls preload="none" src={'/api/audio/'+a.id}/>}<p>{a.feedback?.summary}</p>{Object.entries(a.feedback?.criteria||{}).map(([k,c]:any)=><div key={k}><h4>{k}</h4><p>{c.observation}</p><p>{c.drill}</p></div>)}</details>)}</div>}{target&&typeof target==='object'&&<form className="cms-editor" onSubmit={e=>{e.preventDefault();run(async()=>{await api('admin/user',{userId:target.user_id,action,reason,day,kind});setTarget(null);await load();await onSaved();setMessage('Learner action recorded.');})}}><h3>{action}: {target.name}</h3>{action==='override-pass'&&<div className="form-grid">{field('Milestone day',day,v=>setDay(Number(v)),'number')}<label>Type<select value={kind} onChange={e=>setKind(e.target.value)}>{['daily','weekly','revision'].map(t=><option key={t}>{t}</option>)}</select></label></div>}<label>Reason<textarea minLength={8} required value={reason} onChange={e=>setReason(e.target.value)}/></label>{action==='delete-user'&&<p>Deletes this learner’s stored recordings, answers, messages and progress, and blocks this account from re-registering. This cannot be undone.</p>}<button className="button" disabled={busy}>Confirm account action</button><button type="button" onClick={()=>setTarget(null)}>Cancel</button></form>}</section>}
  {tab==='Messages'&&<section className="panel"><h3>Private support inbox</h3>{overview?.messages.map((m:any)=><form className="message-card" key={m.id} onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);run(async()=>{await api('admin/message',{id:m.id,reply:String(f.get('reply')),status:String(f.get('status'))});await load();setMessage('Reply saved to the learner’s private inbox.');})}}><h4>{m.subject}</h4><small>{m.name} · {m.status}</small><p>{m.body}</p><label>Reply<textarea name="reply" defaultValue={m.reply} required/></label><select name="status" defaultValue={m.status}>{['open','answered','closed'].map(v=><option key={v}>{v}</option>)}</select><button className="button" disabled={busy}>Save reply</button></form>)}</section>}
+ {tab==='Live Diagnostics'&&<section className="panel"><h3>Production Login, Database & AI Diagnostics</h3>
+ <p>These tests use your current verified owner session and the actual deployed Cloudflare D1 and AI services. No API key is displayed or re-entered, and no learner recording is stored.</p>
+ <div className="admin-qa-actions">
+  <button className="button" disabled={busy} onClick={()=>void productionDiagnostics()}>{busy?'Running checks…':'Run production Google session + D1 + AI checks'}</button>
+  <button className="button" disabled={busy} onClick={()=>void testMicrophone()}>Test my real microphone (4 seconds)</button>
+ </div>
+ {liveCheckedAt&&<p className="admin-qa-timestamp">Last test: {liveCheckedAt}</p>}
+ {liveChecks.length>0&&<div className="admin-qa-results" role="status">{liveChecks.map(check=><div key={check.name} className={'admin-qa-'+check.status}><strong>{check.status==='pass'?'PASS':check.status==='fail'?'FAIL':'NOT TESTED'} · {check.name}</strong><p>{check.detail}</p></div>)}</div>}
+ <p>Passing the text and sample-audio checks verifies real provider access; the device-specific microphone check requires the browser to grant permission. These checks do not create a practice attempt or change a learner’s scores.</p>
+ </section>}
  {tab==='Audit'&&<section className="panel"><h3>Administrative change history</h3>{overview?.activity.map((a:any)=><p key={a.id}>{a.created_at} · {a.action} · {a.detail}</p>)}</section>}
  </section>;
 }
