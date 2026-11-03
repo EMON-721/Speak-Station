@@ -132,7 +132,7 @@ try{
   await page.locator('.profile-trigger').click();
   await page.locator('.profile-form').waitFor({state:'visible'});
   assert((await page.locator('.profile-identifiers').innerText()).includes('qa@example.test'));
-  assert((await page.locator('.profile-heading h3').innerText()).includes('#1'),'joining number beside profile name');
+  assert((await page.locator('.profile-heading h3').innerText()).includes('#0001'),'joining number beside profile name');
   await page.getByLabel('Your name',{exact:true}).fill('QA Updated');
   await page.getByRole('button',{name:/Save my preferences/}).click();
   await page.getByText('Your learning preferences are saved.').waitFor();
