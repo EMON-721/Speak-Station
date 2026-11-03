@@ -11,6 +11,10 @@ Speak Station is a browser-based **English speaking and IELTS-style practice pla
 
 > **Assessment notice:** All speaking scores and corrections are AI-generated practice estimates. They may be inaccurate and are **not official IELTS scores**. Use an official IELTS assessment to confirm your level.
 
+## Account options
+
+Learners can **continue with Google** or **create an email account** using their name, email address, a unique User ID and a password (at least 12 characters). New email accounts receive an automatically allocated profile/member number starting at **#9057** (existing issued numbers are not altered). Returning email learners sign in with their User ID and password. Existing legacy email accounts may still sign in with their email address. Google owner-only admin permissions are unchanged. Account email addresses supplied during password signup are not yet independently email-verified.
+
 ## What Speak Station offers
 
 | Area | Experience |
