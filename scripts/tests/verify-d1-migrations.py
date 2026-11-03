@@ -73,12 +73,11 @@ conn.execute("DELETE FROM member_numbers WHERE user_id='qa-user-2'")
 conn.execute(allocate,('qa-user-3','qa-user-3'))
 assert conn.execute("SELECT member_number FROM member_numbers WHERE user_id='qa-user-3'").fetchone()[0]==9059
 legacy=sqlite3.connect(':memory:')
-for path in files[:-2]:legacy.executescript(path.read_text().replace('--> statement-breakpoint','').strip())
+for path in files[:-3]:legacy.executescript(path.read_text().replace('--> statement-breakpoint','').strip())
 legacy.execute("INSERT INTO profiles(user_id,name,track,created_at) VALUES ('late','Late',210,'2026-11-02T00:00:00Z')")
 legacy.execute("INSERT INTO profiles(user_id,name,track,created_at) VALUES ('early','Early',210,'2026-10-01T00:00:00Z')")
-legacy.executescript(files[-2].read_text().replace('--> statement-breakpoint','').strip())
-legacy.executescript(files[-1].read_text().replace('--> statement-breakpoint','').strip())
-assert legacy.execute('SELECT user_id FROM member_numbers ORDER BY member_number').fetchall()==[('early',),('late',)]
+for path in files[-3:]:legacy.executescript(path.read_text().replace('--> statement-breakpoint','').strip())
+assert legacy.execute('SELECT member_number,user_id FROM member_numbers ORDER BY member_number').fetchall()==[(1,'early'),(2,'late')]
 assert {'email','user_id','name','salt','password_hash','created_at','login_id'}.issubset(cols('email_accounts'))
 assert {'key','attempts','reset_at'}.issubset(cols('email_auth_limits'))
 print('PASS: stable member IDs beginning at 9057, historical Google users preserved, and isolated email account schema')
