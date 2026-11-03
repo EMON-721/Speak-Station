@@ -85,3 +85,33 @@ for(const mode of [undefined,'','chatgpt','disabled']){
 const forged=await standaloneIdentity(new Request('https://speak.test/api/state',{headers:{cookie:'__Host-speak-session='+signed+'x'}}),env,true);
 assert.equal(forged.headers.has('oai-authenticated-user-id'),false,'tampered session cannot inject identity');
 console.log('PASS: standalone auth cannot be disabled by missing or changed AUTH_MODE');
+
+
+// Cloudflare Free email sign-up regression: exercise real D1 SQL and PBKDF2 with
+// a synthetic account. Workers rejects PBKDF2 iteration counts above 100,000.
+{
+ const {DatabaseSync}=await import('node:sqlite');
+ const fs=await import('node:fs');
+ const sql=new DatabaseSync(':memory:');
+ for(const name of fs.readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())sql.exec(fs.readFileSync('drizzle/'+name,'utf8'));
+ const DB={prepare(query){let values=[];return {bind(...args){values=args;return this;},async first(){return sql.prepare(query).get(...values)||null;},async run(){const result=sql.prepare(query).run(...values);return {success:true,meta:{changes:Number(result.changes)}};}};}};
+ const testEnv={...env,DB};
+ const post=(endpoint,body)=>standaloneIdentity(new Request('https://speak.test/email-auth/'+endpoint,{method:'POST',headers:{'Origin':'https://speak.test','Content-Type':'application/json'},body:JSON.stringify(body)}),testEnv,true);
+ const signup=await post('signup',{name:'Signup Tester',email:'new-learner@example.test',loginId:'learner9057',password:'test-pass-8'});
+ assert.equal(signup.status,201,'Cloudflare-compatible email account signup should succeed');
+ const result=await signup.json();assert.equal(result.ok,true);
+ const account=sql.prepare('SELECT user_id,password_hash FROM email_accounts WHERE login_id=?').get('learner9057');
+ assert(account?.password_hash&&account.password_hash.length===64,'password stored only as salted hash');
+ assert(!account.password_hash.includes('test-pass-8'));
+ assert.equal(sql.prepare('SELECT member_number FROM member_numbers WHERE user_id=?').get(account.user_id).member_number,9057);
+ const duplicate=await post('signup',{name:'Duplicate',email:'new-learner@example.test',loginId:'anotheruser',password:'test-pass-8'});
+ assert.equal(duplicate.status,409);
+ const login=await post('login',{loginId:'learner9057',password:'test-pass-8'});
+ assert.equal(login.status,200,'new learner logs in using User ID and password');
+ const cookie=login.headers.get('set-cookie').match(/__Host-speak-session=([^;]+)/)[1];
+ const identity=await standaloneIdentity(new Request('https://speak.test/api/state',{headers:{cookie:'__Host-speak-session='+cookie}}),testEnv,true);
+ assert.equal(identity.headers.get('oai-authenticated-user-id'),account.user_id);
+ const bad=await post('login',{loginId:'learner9057',password:'wrongpass'});
+ assert.equal(bad.status,401,'incorrect password must be rejected');
+ console.log('PASS: Cloudflare-compatible email signup, D1 account, 9057 member ID, login session and password rejection');
+}
