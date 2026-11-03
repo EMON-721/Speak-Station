@@ -14,7 +14,7 @@ const validEmail=(v:string)=>v.length<=254&&/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.tes
 const bytesToHex=(v:Uint8Array)=>Array.from(v).map(n=>n.toString(16).padStart(2,'0')).join('');
 const hashPassword=async(password:string,salt:Uint8Array)=>{
  const material=await crypto.subtle.importKey('raw',encoder.encode(password),'PBKDF2',false,['deriveBits']);
- return bytesToHex(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:210000},material,256)));
+ return bytesToHex(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(salt).buffer,iterations:210000},material,256)));
 };
 const authJson=(message:string,status:number)=>Response.json({error:message},{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const secretEqual=(a:string,b:string)=>{let diff=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)diff|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return diff===0;};
