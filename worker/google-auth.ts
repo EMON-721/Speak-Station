@@ -32,7 +32,7 @@ async function emailAuth(request:Request,env:any,secret:string,origin:string){
  const email=emailAddress(body?.email),loginId=typeof body?.loginId==='string'?body.loginId.trim().toLowerCase():'',password=body?.password;
  if(register&&!validLoginId(loginId))return authJson('User ID must be 4–30 characters, starting with a letter; use lowercase letters, numbers, dots, underscores or hyphens.',400);
  if(!register&&!validLoginId(loginId)&&!validEmail(loginId))return authJson('Enter your User ID and password.',400);
- if((register&&!validEmail(email))||typeof password!=='string'||password.length<12||password.length>128)return authJson('Enter a valid email and password of at least 12 characters.',400);
+ if((register&&!validEmail(email))||typeof password!=='string'||password.length<8||password.length>128)return authJson('Enter a valid email and password of at least 8 characters.',400);
  const db=env.DB as D1Database;
  // Account-level throttling. Failure records are never returned to the browser.
  const limitKey=bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode('email-auth:'+loginId))));
