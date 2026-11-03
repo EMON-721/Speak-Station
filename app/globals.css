@@ -694,3 +694,18 @@ body{background:#111214;color:#F2F3F5}
 .profile-heading h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .profile-heading .member-number{display:inline-flex;align-items:center;padding:2px 9px;border:1px solid #697a7c;border-radius:999px;background:#303b3d;color:#eef6f5;font-size:12px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
 .profile-trigger-text strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
+
+
+/* Independent email account path: Google sign-in and all learner UI remain intact. */
+.auth-divider{display:flex;align-items:center;gap:12px;text-align:center;margin:20px 0;color:#adb7c7;font-size:13px}
+.auth-divider:before,.auth-divider:after{content:'';height:1px;background:#465061;flex:1}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.auth-tabs button{padding:11px;border:1px solid #465061;border-radius:10px;color:#dbe3ee;background:#242933;font-weight:600}
+.auth-tabs button[aria-pressed=true]{background:#38485d;border-color:#93afce;color:white}
+.auth-email-form{display:grid;gap:12px;text-align:left}
+.auth-email-form label{display:grid;gap:6px;color:#e2e8f0;font-size:13px;font-weight:600}
+.auth-email-form input{width:100%;border:1px solid #5d697a;background:#131922;border-radius:9px;color:white;padding:12px 13px;font:inherit}
+.auth-email-form input:focus-visible,.auth-tabs button:focus-visible,.auth-email-submit:focus-visible{outline:2px solid #9ac5f4;outline-offset:2px}
+.auth-email-submit{background:#dbe7fb;color:#172334;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+.auth-email-submit:disabled{opacity:.6;cursor:wait}
+.auth-gate-card{max-height:none}
