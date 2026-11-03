@@ -85,7 +85,10 @@ export async function standaloneIdentity(request:Request,env:any,standaloneBuild
   if(!configured)return new Response('Sign-in is not configured yet. The owner must add the Google sign-in settings in Cloudflare Worker secrets.',{status:503,headers:{'Content-Type':'text/plain;charset=UTF-8','Cache-Control':'no-store'}});
   const origin=applicationOrigin;
   if(url.origin!==origin)return new Response('Open the configured application address to sign in.',{status:400});
-  if(url.pathname.startsWith('/email-auth/'))return emailAuth(request,env,secret,origin);
+  if(url.pathname.startsWith('/email-auth/')){
+   try{return await emailAuth(request,env,secret,origin)}
+   catch(error){console.error('EMAIL_AUTH_FAILURE',JSON.stringify({stage:'account_storage',errorType:error instanceof Error&&error.name==='TypeError'?'TypeError':'ServerError'}));return authJson('Account service is temporarily unavailable. Check database migrations and try again.',503)}
+  }
   if(url.pathname==='/signout-with-chatgpt')return redirect(origin+safeReturn(url.searchParams.get('return_to')),[setCookie('__Host-speak-session','',0),setCookie('__Host-speak-oauth','',0)]);
   if(url.pathname==='/signin-with-chatgpt'){
    const state=b64(crypto.getRandomValues(new Uint8Array(32))),verifier=b64(crypto.getRandomValues(new Uint8Array(32))),challenge=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(verifier))));
