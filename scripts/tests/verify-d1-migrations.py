@@ -71,7 +71,7 @@ assert members==[(9057,'qa-user-1'),(9058,'qa-user-2')],members
 number2=members[1][0]
 conn.execute("DELETE FROM member_numbers WHERE user_id='qa-user-2'")
 conn.execute(allocate,('qa-user-3','qa-user-3'))
-assert conn.execute("SELECT member_number FROM member_numbers WHERE user_id='qa-user-3'").fetchone()[0]==59
+assert conn.execute("SELECT member_number FROM member_numbers WHERE user_id='qa-user-3'").fetchone()[0]==9059
 legacy=sqlite3.connect(':memory:')
 for path in files[:-2]:legacy.executescript(path.read_text().replace('--> statement-breakpoint','').strip())
 legacy.execute("INSERT INTO profiles(user_id,name,track,created_at) VALUES ('late','Late',210,'2026-11-02T00:00:00Z')")
