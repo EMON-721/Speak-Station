@@ -10,7 +10,8 @@ export async function signAuth(value:unknown,secret:string){const payload=b64(en
 export async function verifyAuth(value:string,secret:string):Promise<any|null>{try{const [payload,signature,extra]=value.split('.');if(extra||!payload||!signature||!await crypto.subtle.verify('HMAC',await key(secret),decode(signature),encoder.encode(payload)))return null;const v=JSON.parse(new TextDecoder().decode(decode(payload)));return typeof v.exp==='number'&&v.exp>Date.now()?v:null;}catch{return null;}}
 
 const emailAddress=(v:unknown)=>typeof v==='string'?v.trim().toLowerCase():'';
-const validEmail=(v:string)=>v.length<=254&&/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v);
+const validEmail=(v:string)=>v.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+const validLoginId=(v:string)=>/^[a-z][a-z0-9._-]{3,29}$/.test(v);
 const bytesToHex=(v:Uint8Array)=>Array.from(v).map(n=>n.toString(16).padStart(2,'0')).join('');
 const hashPassword=async(password:string,salt:Uint8Array)=>{
  const material=await crypto.subtle.importKey('raw',encoder.encode(password),'PBKDF2',false,['deriveBits']);
@@ -27,34 +28,35 @@ async function emailAuth(request:Request,env:any,secret:string,origin:string){
  if(!env.DB)return authJson('Account storage is not available.',503);
  let body:any;
  try{const source=await request.text();if(source.length>8192)return authJson('Request is too large.',413);body=JSON.parse(source);}catch{return authJson('Invalid request.',400);}
- const email=emailAddress(body?.email),password=body?.password;
- if(!validEmail(email)||typeof password!=='string'||password.length<12||password.length>128)return authJson('Enter a valid email and password of at least 12 characters.',400);
+ const register=url.pathname==='/email-auth/signup';
+ const email=emailAddress(body?.email),loginId=typeof body?.loginId==='string'?body.loginId.trim().toLowerCase():'',password=body?.password;
+ if(!validLoginId(loginId))return authJson('User ID must be 4–30 characters, starting with a letter; use lowercase letters, numbers, dots, underscores or hyphens.',400);
+ if((register&&!validEmail(email))||typeof password!=='string'||password.length<12||password.length>128)return authJson('Enter a valid email and password of at least 12 characters.',400);
  const db=env.DB as D1Database;
  // Account-level throttling. Failure records are never returned to the browser.
- const limitKey=bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode('email-auth:'+email))));
+ const limitKey=bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode('email-auth:'+loginId))));
  const now=Date.now(),windowMs=15*60*1000;
  const limit=await db.prepare('SELECT attempts,reset_at FROM email_auth_limits WHERE key=?').bind(limitKey).first() as any;
  if(limit&&Number(limit.reset_at)>now&&Number(limit.attempts)>=8)return authJson('Too many attempts. Try again later.',429);
- const register=url.pathname==='/email-auth/signup';
  if(!register&&url.pathname!=='/email-auth/login')return authJson('Not found.',404);
  if(register){
   const name=typeof body?.name==='string'?body.name.trim():'';
   if(name.length<2||name.length>100)return authJson('Enter your name (2–100 characters).',400);
-  const existing=await db.prepare('SELECT user_id FROM email_accounts WHERE email=?').bind(email).first();
-  if(existing)return authJson('An account using this email already exists. Please log in.',409);
+  const existing=await db.prepare('SELECT user_id FROM email_accounts WHERE email=? OR login_id=?').bind(email,loginId).first();
+  if(existing)return authJson('This email or User ID is already registered. Please log in.',409);
   const salt=crypto.getRandomValues(new Uint8Array(16));
   const passhash=await hashPassword(password,salt);
   const id='email:'+crypto.randomUUID();
   try{
-   await db.prepare('INSERT INTO email_accounts(email,user_id,name,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)').bind(email,id,name,bytesToHex(salt),passhash,new Date().toISOString()).run();
+   await db.prepare('INSERT INTO email_accounts(email,user_id,name,salt,password_hash,created_at,login_id) VALUES(?,?,?,?,?,?,?)').bind(email,id,name,bytesToHex(salt),passhash,new Date().toISOString(),loginId).run();
   }catch{return authJson('Unable to register. This email may already be in use.',409);}
-  // Atomically reserve a permanent member number. Existing Google numbers are preserved.
+  // Reserve a permanent member number from the configured 9057+ range. Existing Google numbers are preserved.
   await db.prepare('INSERT OR IGNORE INTO member_numbers(user_id) VALUES (?)').bind(id).run();
   await db.prepare('INSERT OR IGNORE INTO profiles(user_id,name,track,created_at) VALUES(?,?,?,?)').bind(id,name,210,new Date().toISOString()).run();
   const session=await signAuth({sub:id,provider:'email',email,name,exp:Date.now()+7*86400000},secret);
   return new Response(JSON.stringify({ok:true}),{status:201,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Set-Cookie':setCookie('__Host-speak-session',session,7*86400)}});
  }
- const found=await db.prepare('SELECT user_id,name,salt,password_hash FROM email_accounts WHERE email=?').bind(email).first() as any;
+ const found=await db.prepare('SELECT user_id,name,email,salt,password_hash FROM email_accounts WHERE login_id=?').bind(loginId).first() as any;
  // Evaluate a password hash even for missing users to reduce account probing.
  const salt=found?.salt?new Uint8Array(found.salt.match(/.{2}/g).map((n:string)=>parseInt(n,16))):new Uint8Array(16);
  const candidate=await hashPassword(password,salt);
@@ -65,7 +67,7 @@ async function emailAuth(request:Request,env:any,secret:string,origin:string){
  await db.prepare('DELETE FROM email_auth_limits WHERE key=?').bind(limitKey).run();
  const access=await db.prepare('SELECT status FROM user_access WHERE user_id=?').bind(found.user_id).first() as any;
  if(access&&access.status!=='active')return authJson('This account is not available.',403);
- const session=await signAuth({sub:found.user_id,provider:'email',email,name:found.name,exp:Date.now()+7*86400000},secret);
+ const session=await signAuth({sub:found.user_id,provider:'email',email:found.email,name:found.name,exp:Date.now()+7*86400000},secret);
  return new Response(JSON.stringify({ok:true}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Set-Cookie':setCookie('__Host-speak-session',session,7*86400)}});
 }
 
