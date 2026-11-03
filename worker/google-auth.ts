@@ -30,7 +30,8 @@ async function emailAuth(request:Request,env:any,secret:string,origin:string){
  try{const source=await request.text();if(source.length>8192)return authJson('Request is too large.',413);body=JSON.parse(source);}catch{return authJson('Invalid request.',400);}
  const register=url.pathname==='/email-auth/signup';
  const email=emailAddress(body?.email),loginId=typeof body?.loginId==='string'?body.loginId.trim().toLowerCase():'',password=body?.password;
- if(!validLoginId(loginId))return authJson('User ID must be 4–30 characters, starting with a letter; use lowercase letters, numbers, dots, underscores or hyphens.',400);
+ if(register&&!validLoginId(loginId))return authJson('User ID must be 4–30 characters, starting with a letter; use lowercase letters, numbers, dots, underscores or hyphens.',400);
+ if(!register&&!validLoginId(loginId)&&!validEmail(loginId))return authJson('Enter your User ID and password.',400);
  if((register&&!validEmail(email))||typeof password!=='string'||password.length<12||password.length>128)return authJson('Enter a valid email and password of at least 12 characters.',400);
  const db=env.DB as D1Database;
  // Account-level throttling. Failure records are never returned to the browser.
@@ -56,7 +57,7 @@ async function emailAuth(request:Request,env:any,secret:string,origin:string){
   const session=await signAuth({sub:id,provider:'email',email,name,exp:Date.now()+7*86400000},secret);
   return new Response(JSON.stringify({ok:true}),{status:201,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Set-Cookie':setCookie('__Host-speak-session',session,7*86400)}});
  }
- const found=await db.prepare('SELECT user_id,name,email,salt,password_hash FROM email_accounts WHERE login_id=?').bind(loginId).first() as any;
+ const found=await db.prepare('SELECT user_id,name,email,salt,password_hash FROM email_accounts WHERE login_id=? OR (login_id IS NULL AND email=?)').bind(loginId,loginId).first() as any;
  // Evaluate a password hash even for missing users to reduce account probing.
  const salt=found?.salt?new Uint8Array(found.salt.match(/.{2}/g).map((n:string)=>parseInt(n,16))):new Uint8Array(16);
  const candidate=await hashPassword(password,salt);
