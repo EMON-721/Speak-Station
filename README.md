@@ -13,7 +13,7 @@ Speak Station is a browser-based **English speaking and IELTS-style practice pla
 
 ## Account options
 
-Learners can **continue with Google** or **create an email account** using their name, email address, a unique User ID and a password (at least 8 characters). New email accounts receive an automatically allocated profile/member number starting at **#9057** (existing issued numbers are not altered). Returning email learners sign in with their User ID and password. Existing legacy email accounts may still sign in with their email address. Google owner-only admin permissions are unchanged. Account email addresses supplied during password signup are not yet independently email-verified.
+Learners can **continue with Google** or **create an email account** using their name, email address, a unique User ID and a password (at least 8 characters). New email accounts receive an automatically allocated profile/member number starting at **#9057** (existing issued numbers are not altered). Returning email learners sign in with their User ID and password. Existing legacy email accounts may still sign in with their email address. Account email addresses supplied during password signup are not yet independently email-verified.
 
 ## What Speak Station offers
 
