@@ -1,13 +1,18 @@
 # Speak Station
 
+## Administration
+
+The owner administration workspace manages speaking content, site wording, question and assessment collections, member accounts and support messages. An administrator can adjust branding and homepage sections, review member progress, apply account restrictions and record explained assessment overrides. Those overrides are separate from AI speaking estimates. See [Administrator guide](docs/ADMIN_GUIDE.md) for the precise controls and permissions.
+
+
 **Your voice. Your next chapter.**
 
 Speak Station is a browser-based **English speaking and IELTS-style practice platform**. It combines complete speaking-test books, guided daily practice, scheduled weekly and revision exams, recorded answers, question-specific AI feedback and a personal score history in one place.
 
 **🌐 [Open Speak Station](https://speak-station.emon721.workers.dev)**  
-**📂 [GitHub Repository](https://github.com/EMON-721/Speak-Station)**
+**📂 [GitHub Repository](https://github.com/emonhossain24/Speak-Station)**
 
-[![Verify Speak Station](https://github.com/EMON-721/Speak-Station/actions/workflows/verify-speaking.yml/badge.svg?branch=main)](https://github.com/EMON-721/Speak-Station/actions/workflows/verify-speaking.yml)
+[![Verify Speak Station](https://github.com/emonhossain24/Speak-Station/actions/workflows/verify-speaking.yml/badge.svg?branch=main)](https://github.com/emonhossain24/Speak-Station/actions/workflows/verify-speaking.yml)
 
 > **Assessment notice:** All speaking scores and corrections are AI-generated practice estimates. They may be inaccurate and are **not official IELTS scores**. Use an official IELTS assessment to confirm your level.
 
@@ -178,8 +183,8 @@ The application is built with **React, TypeScript and Vinext**, runs on **Cloudf
 ## Project links
 
 **Website:** https://speak-station.emon721.workers.dev  
-**Repository:** https://github.com/EMON-721/Speak-Station  
-**Build verification:** https://github.com/EMON-721/Speak-Station/actions/workflows/verify-speaking.yml
+**Repository:** https://github.com/emonhossain24/Speak-Station  
+**Build verification:** https://github.com/emonhossain24/Speak-Station/actions/workflows/verify-speaking.yml
 
 The verification workflow checks TypeScript, speaking-book and progression tests, and the Cloudflare production build. A passing build confirms those checks, **not** that every live microphone, sign-in or external assessment interaction has been end-to-end tested.
 
@@ -192,11 +197,8 @@ The verification workflow checks TypeScript, speaking-book and progression tests
 
 Each Google user receives a permanent numeric joining number, visible beside their own name in Profile and the profile header. Existing members are ordered by available profile creation time during the migration, and new numbers are assigned atomically on authenticated requests. Numbers are never reassigned or reused. These display numbers do not replace private Google account identifiers.
 
-<!-- DEPLOYMENT LINKS: maintained for GitHub repository navigation -->
 ## Website & repository links
 
-- **Source repository:** https://github.com/EMON-721/Speak-Station
+- **Source repository:** https://github.com/emonhossain24/Speak-Station
 - **Published website URL:** https://speak-station.emon721.workers.dev
-- **Availability:** Deployment URL recorded; live HTTP reachability could not be independently verified on 1 November 2026.
 
-<!-- END DEPLOYMENT LINKS -->
