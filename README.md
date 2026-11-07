@@ -1,10 +1,5 @@
 # Speak Station
 
-## Administration
-
-The owner administration workspace manages speaking content, site wording, question and assessment collections, member accounts and support messages. An administrator can adjust branding and homepage sections, review member progress, apply account restrictions and record explained assessment overrides. Those overrides are separate from AI speaking estimates. See [Administrator guide](docs/ADMIN_GUIDE.md) for the precise controls and permissions.
-
-
 **Your voice. Your next chapter.**
 
 Speak Station is a browser-based **English speaking and IELTS-style practice platform**. It combines complete speaking-test books, guided daily practice, scheduled weekly and revision exams, recorded answers, question-specific AI feedback and a personal score history in one place.
